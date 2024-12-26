@@ -13,7 +13,7 @@ app.use('/api', childRoutes);
 
 // Default route
 app.get('/', (req, res) => {
-  res.send('Welcome to the Child Vaccination Record System API');
+  res.send('Welcome to the Sawari Sathi Backend API');
 });
 
 // Start server
