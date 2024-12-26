@@ -1,9 +1,17 @@
-import { createClient } from '@supabase/supabase-js'
-import dotenv from 'dotenv'
-dotenv.config()
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL
-const supabaseKey = process.env.REACT_APP_ANON_KEY
+import { createClient } from "@supabase/supabase-js";
+import dotenv from 'dotenv';
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+dotenv.config();
 
-export default supabase
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    "SUPABASE_URL and SUPABASE_KEY must be defined in the .env file"
+  );
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+export default supabase;
