@@ -1,19 +1,14 @@
 import express from 'express';
 import {
-  createChildAccount,
-  getAllChildren,
-  getChildById,
-  updateChildAccount,
-  deleteChildAccount
+  getFare,
+  getYatayatId
 } from '../controllers/childController.js';
 
 const router = express.Router();
 
 // Define routes for children
-router.post('/children', createChildAccount);
-router.get('/children', getAllChildren);
-router.get('/children/:id', getChildById);
-router.put('/children/:id', updateChildAccount);
-router.delete('/children/:id', deleteChildAccount);
+router.get('/fare', getFare);
+router.get('/yatayat/:id', getYatayatId);
+
 
 export default router;

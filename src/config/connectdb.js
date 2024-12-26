@@ -3,8 +3,8 @@ import supabase from './supabaseClient.js';
 export const connectDB = async () => {
   try {
     const { data, error } = await supabase
-      .from('children')  
-      .select('child_id')
+      .from('route')  
+      .select('route_name')
       .limit(5);
 
     if (error) {
