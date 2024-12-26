@@ -1,12 +1,22 @@
-import supabase from "./config/supabaseClient.js";
 import dotenv from 'dotenv';
+import app from './config/server.js';
+import { connectDB } from './config/connectdb.js'
+// import hospitalRoutes from './routes/hospitalRoutes.js';
+import childRoutes from './routes/childRoutes.js'
 
-dotenv.config()
-const Home =()=>{
-  console.log(supabase)
-}
+dotenv.config();
 
-export default Home;
+// Connect to the database
+connectDB();
+
+// Use routes
+// app.use('/api', hospitalRoutes);
+app.use('/api', childRoutes);
+
+// Default route
+app.get('/', (req, res) => {
+  res.send('Welcome to the Child Vaccination Record System API');
+});
 
 // Start server
 const port = process.env.PORT || 5000;
