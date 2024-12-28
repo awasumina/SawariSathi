@@ -1,4 +1,3 @@
-
 SELECT *
 FROM "stops"
 inner join "route_stops"
@@ -10,3 +9,6 @@ where "route_id" in  (
     ON "route_stops"."stops_id" = "stops"."id"
     WHERE ("route_stops"."stops_id" = 2 OR "route_stops"."stops_id" = 4)
 );
+
+
+
