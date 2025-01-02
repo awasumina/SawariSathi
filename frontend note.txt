@@ -1,0 +1,16 @@
+
+//To display the image on the frontend, you can use the fetched URL:
+
+async function fetchImageUrl(bucketName, filePath) {
+  const response = await fetch(
+    `http://localhost:3000/api/getVehicleImage?bucketName=${bucketName}&filePath=${filePath}`
+  );
+  const data = await response.json();
+  if (data.imageUrl) {
+    document.getElementById('imageElement').src = data.imageUrl;
+  } else {
+    console.error('Error:', data.error);
+  }
+}
+
+fetchImageUrl('Vehicle', 'sajha.jpg');

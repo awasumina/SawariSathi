@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import app from './config/server.js';
 import { connectDB } from './config/connectdb.js'
-import childRoutes from './routes/childRoutes.js'
+import childRoutes from './routes/routes.js'
 
 dotenv.config();
 
@@ -17,7 +17,7 @@ app.get('/', (req, res) => {
 });
 
 // Start server
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });

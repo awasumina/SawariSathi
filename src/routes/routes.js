@@ -2,15 +2,17 @@ import express from 'express';
 import {
   getFare,
   getYatayatId,
-  getStopsForRoutes
-} from '../controllers/childController.js';
+  getStopsForRoutes,
+  getVehicleImage
+} from '../controllers/routeControllers.js';
 
 const router = express.Router();
 
 // Define routes for children
 router.get('/fare', getFare);
-router.get('/yatayat/:id', getYatayatId);
 router.get('/routes/stops', getStopsForRoutes);
+router.get('/yatayat/vehicleImage', getVehicleImage);
+router.get('/yatayat/:id', getYatayatId);
 
 
 export default router;
