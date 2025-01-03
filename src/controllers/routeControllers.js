@@ -100,7 +100,7 @@ export const getStopsForRoutes = async (req, res) => {
       .from('stops')
       .select('*, route_stops(route_id, stops_id)') // Include related 'route_stops' data
       .in('route_stops.route_id', commonRouteIds); // Filter by the common route IDs
-
+  
     // if (stopsError) {
     //   console.error('Error fetching stops:', stopsError.message);
     //   throw stopsError;
