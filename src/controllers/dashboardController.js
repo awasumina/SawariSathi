@@ -1,16 +1,15 @@
 import supabase from "../config/supabaseClient.js";
 
 export const addStopsdb = async (req, res) => {
-    // Extract values from request body
     const { stopName, latitude, longitude } = req.body;
 
     try {
         const { error } = await supabase
             .from('stop')
            .insert([{
-                stops_name: stopName,  // Match DB column name
-                stops_lon: longitude,  // Match DB column name
-                stops_lat: latitude    // Match DB column name
+                stops_name: stopName,  
+                stops_lon: longitude,  
+                stops_lat: latitude   
             }]); 
 
         if (error) throw error;
@@ -20,14 +19,6 @@ export const addStopsdb = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-
-
-
-
-
-
-
-
 
 
 // Function to fetch stops from the database
@@ -46,20 +37,26 @@ catch(err){
     res.status(500).json({ error: "Error fetching stops" });
 
 }
-    // return data;
+
 };
 
+
+
 // Function to delete a stop from the database
-export async function deleteStopById(id) {
-    const { error } = await supabase.from("stop").delete().match({ id });
-
-    if (error) {
-        console.error("Error deleting stop:", error);
-        return false;
+export const deleteStopById = async (id) => {
+    try {
+        const { error } = await supabase.from("stop").delete().match({ id });
+        
+        if (error) {
+            console.error("Error deleting stop:", error);
+            return false;
+        }
+        return true;  // Return true if deletion is successful
+    } catch (err) {
+        console.error("Error in deleteStopById:", err.message);
+        throw new Error("Database error during stop deletion");
     }
-    return true;
-}
-
+};
 
 // async function editStop(id) {
 //     const row = document.querySelector(`tr[data-stop-id="${id}"]`);
@@ -100,23 +97,6 @@ export async function deleteStopById(id) {
 //     }
 // }
 
-// async function deleteStop(id) {
-//     if (confirm('Are you sure you want to delete this stop?')) {
-//         try {
-//             const { error } = await supabase
-//                 .from('stops')
-//                 .delete()
-//                 .eq('id', id);
-
-//             if (error) throw error;
-
-//             alert('Stop deleted successfully!');
-//             loadStops();
-//         } catch (error) {
-//             alert('Error deleting stop: ' + error.message);
-//         }
-//     }
-// }
 
 // // ============ ROUTES OPERATIONS ============
 // async function addRoute(event) {
