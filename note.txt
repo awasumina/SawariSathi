@@ -1,0 +1,6 @@
+To prevent your Supabase keys from being pushed to GitHub, follow these steps:
+
+Open Your Project Directory
+
+Make sure your .env file is inside your project root.
+Open the .gitignore file (or create one if it doesn’t exist). Add the following line: .env
