@@ -3,9 +3,6 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import path from 'path'; // Import path to handle file paths
 import { fileURLToPath } from "url";
-import { addStopsdb } from '../controllers/dashboardController.js';
-import { getStopdb } from '../controllers/dashboardController.js';
-// import listEndpoints from 'express-list-endpoints'; // Correct import syntax
 
 
 const router = express.Router();
@@ -72,9 +69,7 @@ app.post('/login', (req, res) => {
 app.use('/css', express.static(path.join(__dirname, 'src', 'admindashboard', 'css')));
 app.use('/images', express.static(path.join(__dirname, 'src', 'admindashboard', 'images')));
 app.use('/admindashboard', express.static(path.join(__dirname, 'src/admindashboard')));
-// app.use('/api', stopRoutes);
 
 
-// console.log(listEndpoints(app));
 
 export default app;

@@ -11,7 +11,9 @@ import {
 import {
   addStopsdb,
   getStopdb,
-  deleteStopById
+  deleteStopById,
+  getStopId,
+  updateStopId
 } from '../controllers/dashboardController.js';
 
 const router = express.Router();
@@ -24,6 +26,8 @@ router.get('/yatayat/vehicleImage', getVehicleImage);
 //dashboard
 router.post('/addStop', addStopsdb);
 router.get('/getStops', getStopdb);
+router.get('/getStopById/:id', getStopId);
+router.put('/updateStopById/:id', updateStopId);
 
 router.delete('/deleteStop/:id', async (req, res) => {
   const parsedId = parseInt(req.params.id, 10);

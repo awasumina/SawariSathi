@@ -23,8 +23,3 @@ app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
-
-
-// const isempty = (value) => {
-//   return value === undefined || value === null || value === '';
-// };

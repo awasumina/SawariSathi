@@ -33,4 +33,4 @@ export const addStopsdb = async (req, res) => {
 };
 
 
-6. finally route.js ma api use gareko xa
+6. finally api.js ma api use gareko xa

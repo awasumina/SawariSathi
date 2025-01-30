@@ -45,10 +45,6 @@ export const getYatayatId = async (req, res) => {
 
 
 
-
-
-
-
 export const getStopsForRoutes = async (req, res) => {
   const { stop1, stop2 } = req.query; // Accept stops as query parameters
   console.log(stop1, stop2) ;

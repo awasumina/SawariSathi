@@ -34,21 +34,14 @@ document.addEventListener('DOMContentLoaded', function () {
 async function fetchStops() {
     try {
         const response = await fetch('/api/getStops'); 
-        console.log(response);
         if (!response.ok) {
             throw new Error(data.message || "Failed to fetch stops");
         }
         const data = await response.json();
-
-        console.log(data);
-        console.log(data.data);
-
         const tbody = document.querySelector("tbody");
         tbody.innerHTML = ""; // Clear existing rows
-        // alert('dash');
 
         data.data.forEach((stop) => {
-            // alert('dashboard');
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td>${stop.stops_name}</td>
@@ -66,6 +59,10 @@ async function fetchStops() {
         alert("xxError fetching stops: " + error.message);
     }
 }
+// Load stops when the page loads
+document.addEventListener('DOMContentLoaded', async function () {
+    await fetchStops();
+});
 
 
 
@@ -97,20 +94,135 @@ async function deleteStop(id) {
 }
 
 
+async function editStop(stopId) {
+    try {
+    // alert('dash');
 
-// Function to edit a stop (To be implemented)
-function editStop(id) {
-    alert(`Edit functionality for stop ID: ${id} not implemented yet.`);
-    // Implement form population and update request logic here
+        // Fetch the data for the specific stop
+        const response = await fetch(`/api/getStopById/${stopId}`); 
+        
+        if (!response.ok) {
+            throw new Error("Failed to fetch stop data");
+        }
+
+        const data = await response.json();
+        const stop = data.data;
+
+        // Populate the form with the existing data
+        document.getElementById('stops_name').value = stop.stops_name;
+        document.getElementById('stops_lat').value = stop.stops_lat;
+        document.getElementById('stops_lon').value = stop.stops_lon;
+        document.getElementById('stop_id').value = stop.id;
+
+        // Show the form
+        document.getElementById('editStopForm').style.display = 'block';
+    } catch (error) {
+        console.error(error);
+        alert("Error fetching stop data: " + error.message);
+    }
+}
+
+function closeForm() {
+    // Hide the form
+    document.getElementById('editStopForm').style.display = 'none';
+}
+
+
+
+
+document.getElementById('stopForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+
+    // Get the form data
+    const formData = new FormData(event.target);
+    
+    const stopId = formData.get('stop_id');
+    const stopName = formData.get('stops_name');
+    const stopLat = formData.get('stops_lat');
+    const stopLon = formData.get('stops_lon');
+
+    console.log("stopId:", stopId);
+    console.log("stopName:", stopName);
+    console.log("stopLat:", stopLat);
+    console.log("stopLon:", stopLon);
+
+    try {
+        // Send the updated data to the server
+        const response = await fetch(`/api/updateStopById/${stopId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                stops_name: stopName,
+                stops_lat: stopLat,
+                stops_lon: stopLon
+            }),
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json(); // Parse the response body
+        console.log("Response data:", data);  // Log the response data
+        
+        if (!response.ok) {
+            throw new Error("Failed to update stop");
+        } 
+      
+        // Close the form
+        // closeForm();
+
+        // Optionally, refresh the table or perform other updates
+        // fetchStops();
+    } catch (error) {
+        console.error(error);
+        alert("Error updating stop: " + error.message);
+    }
+});
+
+// document.addEventListener("DOMContentLoaded", fetchStops);
+
+async function fetchStops() {
+    try {
+        // Send a GET request to the API to fetch the stops
+        const response = await fetch('/api/getStops'); 
+        
+        // Check if the response is okay
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || "Failed to fetch stops");
+        }
+
+        // Parse the response JSON data
+        const data = await response.json();
+
+        // Get the tbody element to populate the table
+        const tbody = document.querySelector("tbody");
+        tbody.innerHTML = ""; // Clear existing rows
+
+        // Iterate through the stops data and append rows to the table
+        data.data.forEach((stop) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${stop.stops_name}</td>
+                <td>${stop.stops_lat}</td>
+                <td>${stop.stops_lon}</td>
+                <td class="action-buttons">
+                    <button class="btn btn-sm btn-warning" onclick="editStop('${stop.id}')">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteStop('${stop.id}')">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        // Log the error and display an alert to the user
+        console.error(error);
+        alert("Error fetching stops: " + error.message);
+    }
 }
 
 // Load stops when the page loads
 document.addEventListener('DOMContentLoaded', async function () {
     await fetchStops();
 });
-
-// document.addEventListener("DOMContentLoaded", fetchStops);
-
 
 // async function fetchStops() {
 //     const { data, error } = await supabase.from("stop").select("*");
@@ -139,21 +251,19 @@ document.addEventListener('DOMContentLoaded', async function () {
 //     });
 // }
 
-// // Load stops when the page loads
-// document.addEventListener("DOMContentLoaded", fetchStops);
 
-// // Placeholder functions for edit and delete actions
-// function editStop(id) {
-//     alert(`Edit stop with ID: ${id}`);
-//     // Implement edit functionality here
-// }
 
-// async function deleteStop(id) {
-//     const { error } = await supabase.from("stops").delete().match({ id });
 
-//     if (error) {
-//         console.error("Error deleting stop:", error);
-//     } else {
-//         fetchStops(); // Refresh the table after deletion
-//     }
-// }
+
+
+
+
+
+
+
+
+
+
+
+
+
