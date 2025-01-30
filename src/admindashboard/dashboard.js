@@ -168,7 +168,7 @@ document.getElementById('stopForm').addEventListener('submit', async function(ev
         } 
       
         // Close the form
-        // closeForm();
+        closeForm();
 
         // Optionally, refresh the table or perform other updates
         // fetchStops();
@@ -220,50 +220,6 @@ async function fetchStops() {
 }
 
 // Load stops when the page loads
-document.addEventListener('DOMContentLoaded', async function () {
-    await fetchStops();
-});
-
-// async function fetchStops() {
-//     const { data, error } = await supabase.from("stop").select("*");
-// alert("dashboard.js loaded");
-
-//     if (error) {
-//         console.error("Error fetching stops:", error);
-//         return;
-//     }
-
-//     const tbody = document.querySelector("tbody");
-//     tbody.innerHTML = ""; // Clear existing rows
-
-//     data.forEach((stop) => {
-//         const row = document.createElement("tr");
-//         row.innerHTML = `
-//             <td>${stop.name}</td>
-//             <td>${stop.latitude}</td>
-//             <td>${stop.longitude}</td>
-//             <td class="action-buttons">
-//                 <button class="btn btn-sm btn-warning" onclick="editStop(${stop.id})">Edit</button>
-//                 <button class="btn btn-sm btn-danger" onclick="deleteStop(${stop.id})">Delete</button>
-//             </td>
-//         `;
-//         tbody.appendChild(row);
-//     });
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+// document.addEventListener('DOMContentLoaded', async function () {
+//     await fetchStops();
+// });
