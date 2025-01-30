@@ -11,7 +11,5 @@ if (!supabaseUrl || !supabaseKey) {
     "SUPABASE_URL and SUPABASE_KEY must be defined in the .env file"
   );
 }
-
 const supabase = createClient(supabaseUrl, supabaseKey);
-
 export default supabase;

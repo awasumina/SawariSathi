@@ -14,3 +14,10 @@ async function fetchImageUrl(bucketName, filePath) {
 }
 
 fetchImageUrl('Vehicle', 'sajha.jpg');
+
+
+
+
+https://maps.googleapis.com/maps/api/js?key=<key>&libraries=places&language=en
+
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao&libraries=places&callback=initMap" 

@@ -1,0 +1,16 @@
+sawarisathiBackend/
+│── src/
+│   ├── admindashboard/  
+│   │   ├── dashboard.ejs  <-- EJS file
+│   │   ├── css/           <-- Contains CSS files
+│   │   │   ├── style.css  
+│   │   ├── images/        <-- Contains images
+│   │   │   ├── logo.png  
+│   ├── config/ 
+│   │   ├── connectdb.js  
+│   │   ├── server.js  
+│   │   ├── supabaseclient.js  
+│   ├── controllers/
+│   │   ├── routecontroller.js  
+│   ├── routes/
+│   │   ├── routes.js  
