@@ -3,7 +3,7 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import path from 'path'; // Import path to handle file paths
 import { fileURLToPath } from "url";
-
+import { addStopsdb } from '../controllers/dashboardController.js';
 const app = express();
 
 // Fix __dirname in ES module
@@ -15,6 +15,8 @@ const __filename = fileURLToPath(import.meta.url);
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.static("public"));
+
 
 // Serve static files from the admindashboard directory
 const __dirname = path.resolve(); // Resolve the directory name
@@ -65,4 +67,10 @@ app.use('/css', express.static(path.join(__dirname, 'src', 'admindashboard', 'cs
 app.use('/images', express.static(path.join(__dirname, 'src', 'admindashboard', 'images')));
 app.use('/admindashboard', express.static(path.join(__dirname, 'src/admindashboard')));
 // app.use('/api', stopRoutes);
+
+
+
+app.post('/api/addStop', addStopsdb);
+
+
 export default app;

@@ -1,12 +1,17 @@
 import supabase from "../config/supabaseClient.js";
 
 export const addStopsdb = async (req, res) => {
+    // Extract values from request body
     const { stopName, latitude, longitude } = req.body;
 
     try {
         const { error } = await supabase
             .from('stops')
-            .insert([{ name: stopName, latitude, longitude }]);
+            .insert([{
+                stops_name: stopName,  // Match DB column name
+                stops_lon: longitude,  // Match DB column name
+                stops_lat: latitude    // Match DB column name
+            }]);
 
         if (error) throw error;
 
