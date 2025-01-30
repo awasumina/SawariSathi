@@ -7,11 +7,11 @@ export const addStopsdb = async (req, res) => {
     try {
         const { error } = await supabase
             .from('stop')
-            .insert([{
+           .insert([{
                 stops_name: stopName,  // Match DB column name
                 stops_lon: longitude,  // Match DB column name
                 stops_lat: latitude    // Match DB column name
-            }]);
+            }]); 
 
         if (error) throw error;
 
@@ -20,6 +20,45 @@ export const addStopsdb = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+
+
+
+
+
+
+
+
+
+// Function to fetch stops from the database
+export const getStopdb =  async (req,res)=>{
+    try{
+    const { data, error } = await supabase.from("stop").select("*");
+    
+    if (error) {
+        console.error("Error fetching stops:", error);
+        return null;
+    }
+    res.json({data});
+}
+catch(err){
+    console.error("Error fetching stops:", err.message);
+    res.status(500).json({ error: "Error fetching stops" });
+
+}
+    // return data;
+};
+
+// Function to delete a stop from the database
+export async function deleteStopById(id) {
+    const { error } = await supabase.from("stop").delete().match({ id });
+
+    if (error) {
+        console.error("Error deleting stop:", error);
+        return false;
+    }
+    return true;
+}
 
 
 // async function editStop(id) {

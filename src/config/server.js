@@ -4,6 +4,12 @@ import bodyParser from 'body-parser';
 import path from 'path'; // Import path to handle file paths
 import { fileURLToPath } from "url";
 import { addStopsdb } from '../controllers/dashboardController.js';
+import { getStopdb } from '../controllers/dashboardController.js';
+// import listEndpoints from 'express-list-endpoints'; // Correct import syntax
+
+
+const router = express.Router();
+
 const app = express();
 
 // Fix __dirname in ES module
@@ -39,9 +45,9 @@ app.post('/login', (req, res) => {
     }
   });
 
-app.get('/admindashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'src/admindashboard/admindashboard.html'));
-  });
+// app.get('/admindashboard', (req, res) => {
+//     res.sendFile(path.join(__dirname, 'src/admindashboard/admindashboard.html'));
+//   });
 
 
   app.set('view engine', 'ejs');
@@ -69,8 +75,6 @@ app.use('/admindashboard', express.static(path.join(__dirname, 'src/admindashboa
 // app.use('/api', stopRoutes);
 
 
-
-app.post('/api/addStop', addStopsdb);
-
+// console.log(listEndpoints(app));
 
 export default app;

@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
 import app from './config/server.js';
 import { connectDB } from './config/connectdb.js'
-import childRoutes from './routes/routes.js'
-// import childRoutes from './routes/routes.js'
+import childRoutes from './routes/api.js'
+
 
 dotenv.config();
 

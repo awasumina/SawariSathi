@@ -76,9 +76,7 @@
                         <h5>Add New Stop</h5>
                     </div>
                     <div class="card-body">
-                        <!-- <form id="stop-form" > -->
                             <form id="stop-form" method="POST" action="/api/addStop">
-                        <!-- <form id="stop-form" method="POST"> -->
                             <div class="row">
                                 <div class="col-md-4">
                                     <div class="mb-3">
@@ -110,7 +108,7 @@
                         <h5>Manage Stops</h5>
                     </div>
                     <div class="card-body">
-                        <table class="table">
+                        <!-- <table class="table">
                             <thead>
                                 <tr>
                                     <th>Stop Name</th>
@@ -139,6 +137,19 @@
                                     </td>
                                 </tr>
                             </tbody>
+                        </table> -->
+
+
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Latitude</th>
+                                    <th>Longitude</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody> <!-- Data will be inserted here dynamically -->
                         </table>
                     </div>
                 </div>
@@ -304,7 +315,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <script src="../admindashboard/dashboard.js"></script>z
+    <script src="../admindashboard/dashboard.js"></script>
+    <!-- <script type="module" src="../admindashboard/dashboard.js"></script> -->
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
 </body>
 </html>
