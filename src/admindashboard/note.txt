@@ -1,5 +1,0 @@
-1. converted html  file into ejs file coz HTML is static and cannot dynamically render data from the backend without client-side scripting (JavaScript, AJAX, or React/Vue). This makes it less efficient for admin panels, which usually require dynamic data, authentication checks, and reusable layouts.
-
-2. intalled npm install ejs for that
-
-3. server.js ma gayera path update gareko so that http://localhost:3000/dashboard garera aawos

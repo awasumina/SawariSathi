@@ -6,7 +6,7 @@ export const addStopsdb = async (req, res) => {
 
     try {
         const { error } = await supabase
-            .from('stops')
+            .from('stop')
             .insert([{
                 stops_name: stopName,  // Match DB column name
                 stops_lon: longitude,  // Match DB column name

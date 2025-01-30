@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         try {
-            const response = await fetch('/api/addStop', {  // Make sure this matches server.js
+            const response = await fetch('/api/addStop', {  
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ stopName, latitude, longitude })
