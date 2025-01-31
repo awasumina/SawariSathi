@@ -16,6 +16,22 @@ export const getFare = async (req, res) => {
   }
 };
 
+
+export const getAllStops = async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("stops").select("*"); // Fetch all fare
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ data });
+  } catch (err) {
+    console.error("Error fetching stops:", err.message);
+    res.status(500).json({ error: "Error fetching stops" });
+  }
+};
+
 // Get yatayat
 export const getYatayatId = async (req, res) => {
   const { id } = req.params;

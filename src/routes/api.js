@@ -5,7 +5,8 @@ import {
   getFare,
   getYatayatId,
   getStopsForRoutes,
-  getVehicleImage  
+  getVehicleImage  ,
+  getAllStops
 } from '../controllers/routeControllers.js';
 
 import {
@@ -19,6 +20,7 @@ import {
 const router = express.Router();
 
 router.get('/fare', getFare);
+router.get('/stops', getAllStops);
 router.get('/yatayatById/:id', getYatayatId);
 router.get('/routes/stops', getStopsForRoutes);
 router.get('/yatayat/vehicleImage', getVehicleImage);
