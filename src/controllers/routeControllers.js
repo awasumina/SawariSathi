@@ -45,15 +45,15 @@ export const getYatayatId = async (req, res) => {
 
 
 
-export const getStopsForRoutes = async (req, res) => {
-  const { stop1, stop2 } = req.query; // Accept stops as query parameters
-  console.log(stop1, stop2) ;
-let { data, error } = await supabase
-.rpc('get_stops_on_common_route', {
-  "stop_id1": stop1, 
-  "stop_id2": stop2})
-if (error) console.error(error)
-else console.log(data)
+// export const getStopsForRoutes = async (req, res) => {
+//   const { stop1, stop2 } = req.query; // Accept stops as query parameters
+//   console.log(stop1, stop2) ;
+// let { data, error } = await supabase
+// .rpc('get_stops_on_common_route', {
+//   "stop_id1": stop1, 
+//   "stop_id2": stop2})
+// if (error) console.error(error)
+// else console.log(data)
 
 
 
@@ -117,7 +117,7 @@ else console.log(data)
   //   console.error('Error fetching stops for routes:', err.message);
   //   res.status(500).json({ error: 'Internal server error', message: err.message });
   // }
-};
+// };
 
 
 
@@ -189,49 +189,66 @@ else console.log(data)
 
 
 
-// export const getStopsForRoutes = async (req, res) => {
-//   const { stop1, stop2 } = req.query; // Accept stops as query parameters
+export const getStopsForRoutes = async (req, res) => {
+  const { stop1, stop2 } = req.query; // Accept stops as query parameters
 
-//   try {
-//     console.log(`Received query for stops: stop1=${stop1}, stop2=${stop2}`);
+  try {
+    console.log(`Received query for stops: stop1=${stop1}, stop2=${stop2}`);
     
-//     // Subquery: Get distinct route IDs where stops_id matches stop1 or stop2
-//     const { data: routeIds, error: routeError } = await supabase
-//       .from('route_stops')
-//       .select('route_id', { distinct: true })
-//       .or(`stops_id.eq.${stop1},stops_id.eq.${stop2}`); // Use `or` for multiple conditions
+    // Subquery: Get distinct route IDs where stops_id matches stop1 or stop2
+    const { data: routeIds, error: routeError } = await supabase
+      .from('route_stops')
+      .select('route_id', { distinct: true })
+      .or(`stops_id.eq.${stop1},stops_id.eq.${stop2}`); // Use `or` for multiple conditions
 
-//     if (routeError) {
-//       console.error('Error fetching route IDs:', routeError.message);
-//       throw routeError;
-//     }
+    if (routeError) {
+      console.error('Error fetching route IDs:', routeError.message);
+      throw routeError;
+    }
 
-//     if (!routeIds || !routeIds.length) {
-//       console.log('No route IDs found.');
-//       return res.status(404).json({ error: 'No routes found for the provided stops.' });
-//     }
+    if (!routeIds || !routeIds.length) {
+      console.log('No route IDs found.');
+      return res.status(404).json({ error: 'No routes found for the provided stops.' });
+    }
 
-//     const routeIdList = routeIds.map((route) => route.route_id);
-//     console.log(`Found route IDs: ${routeIdList.join(', ')}`);
+    const routeIdList = routeIds.map((route) => route.route_id);
+    console.log(`Found route IDs: ${routeIdList.join(', ')}`);
 
-//     // Main query: Fetch stops for matching route IDs using table relationships
-//     const { data: stops, error: stopsError } = await supabase
-//       .from('stops')
-//       .select('*, route_stops(route_id, stops_id)') // Include related 'route_stops' data
-//       .in('route_stops.route_id', routeIdList); // Filter by the route IDs
+    // Main query: Fetch stops for matching route IDs using table relationships
+    const { data: stops, error: stopsError } = await supabase
+      .from('stops')
+      .select('*, route_stops(route_id, stops_id)') // Include related 'route_stops' data
+      .in('route_stops.route_id', routeIdList); // Filter by the route IDs
 
-//     if (stopsError) {
-//       console.error('Error fetching stops:', stopsError.message);
-//       throw stopsError;
-//     }
+    if (stopsError) {
+      console.error('Error fetching stops:', stopsError.message);
+      throw stopsError;
+    }
 
-//     console.log('Fetched stops:', stops);
-//     res.json({ data: stops });
-//   } catch (err) {
-//     console.error('Error fetching stops for routes:', err.message);
-//     res.status(500).json({ error: 'Internal server error', message: err.message });
-//   }
-// };
+
+     // Fetch fares data
+     const { data: fare, error: fareError } = await supabase
+     .from('fare')
+     .select('*')
+     .eq('stops_from_id', stop1)
+     .eq('stops_to_id', stop2)
+     .single(); // Assuming only one fare exists per route
+
+   if (fareError && fareError.code !== 'PGRST116') { // Ignore "no rows found" error
+     console.error('Error fetching fare:', fareError.message);
+     throw fareError;
+   }
+
+   res.json({ data: { stops, fare } });
+
+
+    // console.log('Fetched stops:', stops);
+    // res.json({ data: stops });
+  } catch (err) {
+    console.error('Error fetching stops for routes:', err.message);
+    res.status(500).json({ error: 'Internal server error', message: err.message });
+  }
+};
 
 
 

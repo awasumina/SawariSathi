@@ -19,6 +19,7 @@ import {
 const router = express.Router();
 
 router.get('/fare', getFare);
+router.get('/yatayatById/:id', getYatayatId);
 router.get('/routes/stops', getStopsForRoutes);
 router.get('/yatayat/vehicleImage', getVehicleImage);
 
