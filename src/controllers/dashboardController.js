@@ -79,9 +79,9 @@ export const getStopId = async (req, res) => {
 // Function to update a stop by its ID in the database
 export const updateStopId = async (req, res) => {
     const { id } = req.params; // Fetching the ID from the URL parameter
-    const { stopName, latitude, longitude } =req.body; 
+    const { stops_name, stops_lat, stops_lon } =req.body; 
     console.log("Updating stop with ID:", id);
-    console.log("New values:", stopName, latitude, longitude);
+    console.log("New values:", stops_name, stops_lat, stops_lon);
 
     try {
         // Check if the stop exists
@@ -99,9 +99,9 @@ export const updateStopId = async (req, res) => {
         const { error } = await supabase
             .from("stop")
             .update({
-                stops_name: stopName,
-                stops_lat: latitude,
-                stops_lon: longitude,
+                stops_name: stops_name,
+                stops_lat: stops_lat,
+                stops_lon: stops_lon,
             })
             .eq("id", id); // Matching by ID to update the correct stop
 
