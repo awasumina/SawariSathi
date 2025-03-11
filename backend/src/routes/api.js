@@ -8,13 +8,18 @@ import {
   getVehicleImage  ,
   getAllStops
 } from '../controllers/routeControllers.js';
-
+ 
 import {
   addStopsdb,
   getStopdb,
   deleteStopById,
   getStopId,
-  updateStopId
+  updateStopId,
+  addRoutesdb,
+  getRoutedb,
+  deleteRouteById,
+  getRouteId,
+  updateRouteId
 } from '../controllers/dashboardController.js';
 
 const router = express.Router();
@@ -47,6 +52,30 @@ router.delete('/deleteStop/:id', async (req, res) => {
   } catch (err) {
       console.error("Error deleting stops:", err.message);
       res.status(500).json({ error: "Error deleting stops" });
+  }
+});
+
+router.post('/addRoute', addRoutesdb);
+router.get('/getRoutes', getRoutedb);
+router.get('/getRouteById/:id', getRouteId);
+router.put('/updateRouteById/:id', updateRouteId);
+
+
+router.delete('/deleteRoute/:id', async (req, res) => {
+  const parsedId = parseInt(req.params.id, 10);
+  if (isNaN(parsedId)) {
+      return res.status(400).json({ success: false, message: 'Invalid ID format' });
+  }
+  try {
+      const success = await deleteRouteById(parsedId);  // Call the function with parsed ID
+      if (success) {
+          res.status(200).json({ success: true, message: 'Route deleted successfully' });
+      } else {
+          res.status(500).json({ success: false, message: 'Error deleting Route' });
+      }
+  } catch (err) {
+      console.error("Error deleting Route:", err.message);
+      res.status(500).json({ error: "Error deleting Route" });
   }
 });
 

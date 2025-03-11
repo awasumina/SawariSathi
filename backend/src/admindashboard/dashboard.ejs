@@ -108,7 +108,7 @@
                         <h5>Manage Stops</h5>
                     </div>
                     <div class="card-body">
-                        <table class="table">
+                        <table class="table" id="tableStops">
                             <thead>
                                 <tr>
                                     <th>Name</th>
@@ -118,14 +118,7 @@
                                 </tr>
                             </thead>
                             <tbody></tbody> <!-- Data will be inserted here dynamically -->
-                        </table>
-
-
-
-
-
-
-                        
+                        </table>                        
                     </div>
                 </div>
 
@@ -175,22 +168,23 @@
                         <h5>Add New Route</h5>
                     </div>
                     <div class="card-body">
-                        <form>
+                            <form id="route-form" method="POST" action="/api/addRoute">
+                                <form >
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Route Name</label>
-                                        <input type="text" class="form-control" placeholder="Enter route name">
+                                        <input type="text" name="routeName" class="form-control" placeholder="Enter route name">
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Route Number</label>
-                                        <input type="text" class="form-control" placeholder="Enter route number">
+                                        <input type="text" name="routeNumber" class="form-control" placeholder="Enter route number">
                                     </div>
                                 </div>
                             </div>
-                            <div class="mb-3">
+                            <!-- <div class="mb-3">
                                 <label class="form-label">Stops</label>
                                 <select multiple class="form-select">
                                     <option>Bus Station</option>
@@ -198,7 +192,7 @@
                                     <option>Banepa</option>
                                     <option>Aadaa</option>
                                 </select>
-                            </div>
+                            </div> -->
                             <button type="submit" class="btn btn-primary">Add Route</button>
                         </form>
                     </div>
@@ -210,19 +204,20 @@
                         <h5>Manage Routes</h5>
                     </div>
                     <div class="card-body">
-                        <table class="table">
+                        <table class="table" id="tableRoutes">
                             <thead>
                                 <tr>
                                     <th>Route Name</th>
                                     <th>Route Number</th>
-                                    <th>Stops Count</th>
+                                    <!-- <th>Stops Count</th> -->
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
+                                <!-- <tr>
                                     <td>kavresthali</td>
                                     <td>101</td>
+                                
                                     <td>4</td>
                                     <td class="action-buttons">
                                         <button class="btn btn-sm btn-warning">Edit</button>
@@ -237,13 +232,75 @@
                                         <button class="btn btn-sm btn-warning">Edit</button>
                                         <button class="btn btn-sm btn-danger">Delete</button>
                                     </td>
-                                </tr>
+                                </tr> -->
                             </tbody>
                         </table>
                     </div>
                 </div>
-            </div>
 
+
+                <br><br>
+<!-- Form for editing a route -->
+<div id="editRouteForm" class="card mb-4" style="display:none;">
+    <div class="card-header">
+        <h5>Edit Route</h5>
+    </div>
+    <div class="card-body">
+        <form id="routeForm" method="POST" action="/api/updateRoute">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label" for="routes_name">Route Name</label>
+                        <input type="text" id="routes_name" name="routes_name" class="form-control" required>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label" for="route_no">Route Number</label>
+                        <input type="number" id="route_no" name="route_no" class="form-control" step="any" required>
+                    </div>
+                </div>
+            </div>
+            <input type="hidden" id="route_id" name="route_id">
+            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="button" class="btn btn-secondary" onclick="closeForm()">Cancel</button>
+        </form>
+    </div>
+</div>
+         </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+         
             <!-- Fares Tab -->
             <div class="tab-pane fade" id="fares">
                 <!-- Add Fare Form -->
