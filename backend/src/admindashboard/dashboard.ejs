@@ -331,35 +331,35 @@
                         <h5>Add New Fare</h5>
                     </div>
                     <div class="card-body">
-                        <form>
+                            <form id="fare-form" method="POST" action="/api/addFare">
+                            
                             <div class="row">
                                 <div class="col-md-4">
                                     <div class="mb-3">
                                         <label class="form-label">Fare from</label>
-                                        <input type="text" class="form-control" placeholder="Enter fare from">
+                                        <input type="number" name="fareFrom" class="form-control" placeholder="Enter fare from">
                                     </div>
                                 </div> <div class="col-md-4">
                                     <div class="mb-3">
                                         <label class="form-label">Fare to</label>
-                                        <input type="text" class="form-control" placeholder="Enter fare to">
+                                        <input type="number" name="fareTo" class="form-control" placeholder="Enter fare to">
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="mb-3">
-                                        <label class="form-label">Amount</label>
-                                        <input type="number" step="0.01" class="form-control" placeholder="Enter amount">
+                                        <label class="form-label">Fare Amount</label>
+                                        <input type="number" name="fareAmount" step="0.01" class="form-control" placeholder="Enter amount">
                                     </div>
                                 </div>
+
                                 <!-- <div class="col-md-4">
                                     <div class="mb-3">
-                                        <label class="form-label">Route</label>
-                                        <select class="form-select">
-                                            <option value="">All Routes</option>
-                                            <option>route 1</option>
-                                            <option>route2</option>
-                                        </select>
+                                        <label class="form-label">Route Number Amount</label>
+                                        <input type="number" step="0.01" class="form-control" placeholder="Enter Route Number">
                                     </div>
                                 </div> -->
+                                
+                               
                             </div>
                             <button type="submit" class="btn btn-primary">Add Fare</button>
                         </form>
@@ -372,14 +372,15 @@
                         <h5>Manage Fares</h5>
                     </div>
                     <div class="card-body">
-                        <table class="table">
+                        <table  class="table" id="tableFare">
                             <thead>
                                 <tr>
                                     <th>Fare from</th>
                                     <th>Fare to</th>
-                                    <th>Amount</th>
+                                    <th>Fare</th>
+                                    <th>Discounted Fare</th>
                                     <!-- <th>Route</th> -->
-                                    <th>Actions</th>
+                                    <!-- <th>Actions</th> -->
                                 </tr>
                             </thead>
                             <tbody>

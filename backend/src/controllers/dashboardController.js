@@ -319,3 +319,52 @@ export const updateRouteId = async (req, res) => {
     }
 };
 
+
+
+
+
+
+
+//function to add fare
+export const addFaredb = async (req, res) => {
+    const { stops_from, stops_to, fare } = req.body;
+    const discountedFare = fare * 0.55; // 55% of the fare amount
+    console.log("Adding fare:", { stops_from, stops_to, fare, discountedFare });
+    try {
+        const { data: routeData, error: routeError } = await supabase
+            .from('fare')
+            .insert([{ 
+                stops_from_id: stops_from, 
+                stops_to_id : stops_to, 
+                fare : fare,
+                discounted_fare : discountedFare
+            }])
+            .select('id')  // Ensure we get the inserted ID
+            .single();
+
+        if (routeError) throw routeError;
+
+        res.json({ success: true, message: 'fare added successfully' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+
+
+
+// Function to fetch stops from the database
+export const getFaredb =  async (req,res)=>{
+    try{
+    const { data, error } = await supabase.from("fare").select("*");
+    
+    if (error) {
+        console.error("Error fetching fare:", error);
+        return null;
+    }
+    res.json({data});
+}
+catch(err){
+    console.error("Error fetching fare:", err.message);
+    res.status(500).json({ error: "Error fetching fare" });
+}};

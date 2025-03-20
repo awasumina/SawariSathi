@@ -468,3 +468,81 @@ async function fetchRoutes() {
 }
 
 
+
+
+//add fare
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelector('#fare-form').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const stops_from = document.querySelector('input[name="stops_from"]').value.trim();
+        const stops_to = document.querySelector('input[name="stops_to"]').value.trim();
+        const fare = parseFloat(document.querySelector('input[name="fare"]').value.trim());
+        
+        console.log(stops_from, stops_to, fare);
+        
+        if (!fare || !stops_from || !stops_to) {
+            alert("Please fill in all fields.");
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/addFare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stops_from, stops_to, fare })
+            });
+            
+            console.log(response);
+            
+            const result = await response.json();
+            if (result.success) {
+                alert('Fare added successfully!');
+                event.target.reset(); // Clear form after submission
+            } else {
+                alert('Error: ' + result.message);
+            }
+        } catch (error) {
+            alert('Error adding fare: ' + error.message);
+        }
+    });
+});
+
+
+// Function to fetch and display fare
+async function fetchFare() {
+    try {
+        const response = await fetch('/api/getFare'); 
+        if (!response.ok) {
+            throw new Error(data.message || "Failed to fetch fare");
+        }
+        const data = await response.json();
+
+        const tableStops = document.querySelector("#tableFare");
+        const tbody = tableStops.querySelector("tbody");
+    
+
+        // const tbody = document.querySelector(".tableStopstbody");
+        tbody.innerHTML = ""; // Clear existing rows
+
+        data.data.forEach((fares) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${fares.stops_from_id}</td>
+                <td>${fares.stops_to_id}</td>
+                <td>${fares.fare}</td>
+                <td>${fares.discounted_fare}</td>
+            `
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        console.error(error);
+        alert("xxError fetching fare: " + error.message);
+    }
+}
+// Load stops when the page loads
+document.addEventListener('DOMContentLoaded', async function () {
+    await fetchFare();
+});
+
+
+

@@ -19,7 +19,9 @@ import {
   getRoutedb,
   deleteRouteById,
   getRouteId,
-  updateRouteId
+  updateRouteId,
+  getFaredb,
+  addFaredb
 } from '../controllers/dashboardController.js';
 
 const router = express.Router();
@@ -79,6 +81,11 @@ router.delete('/deleteRoute/:id', async (req, res) => {
   } 
 });
 
+
+
+
+router.post('/addFare', addFaredb);
+router.get('/getFare', getFaredb);
 
 // console.log(listEndpoints(router));
 
