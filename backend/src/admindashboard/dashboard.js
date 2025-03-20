@@ -5,16 +5,17 @@ document.addEventListener('DOMContentLoaded', function () {
         const stopName = document.querySelector('input[name="stopName"]').value.trim();
         const latitude = document.querySelector('input[name="latitude"]').value.trim();
         const longitude = document.querySelector('input[name="longitude"]').value.trim();
+        const routeId = document.querySelector('input[name="routeId"]').value.trim();
 
-        if (!stopName || !latitude || !longitude) {
+        if (!stopName || !latitude || !longitude || !routeId) {
             alert("Please fill in all fields.");
-            return;
+            return; 
         }
         try {
             const response = await fetch('/api/addStop', {  
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ stopName, latitude, longitude })
+                body: JSON.stringify({ stopName, latitude, longitude,routeId })
             });
 
             const result = await response.json();
@@ -261,7 +262,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const result = await response.json();
             if (result.success) {
-                alert('Stop added successfully!');
+                alert('route added successfully!');
                 event.target.reset(); // Clear form after submission
             } else {
                 alert('aaError: ' + result.message);

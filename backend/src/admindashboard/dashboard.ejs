@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transit Admin Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/maplibre-gl@^5.2.0/dist/maplibre-gl.css" rel="stylesheet" />
+    
+    
 
 
     <style>
@@ -65,7 +68,14 @@
                 <div class="row">
                     <div class="col-md-12">
                         <div id="map">
-                            [Google Maps Interface Would Appear Here]
+                            <script>
+                                var map = new maplibregl.Map({
+                                    container: 'map', // container id
+                                    style: 'https://maps.gallimap.com/styles/light/style.json', // style URL
+                                    center: [85.3135, 27.7025], // starting position [lng, lat]
+                                    zoom: 15 // starting zoom
+                                });
+                            </script>  
                         </div>
                     </div>
                 </div>
@@ -94,6 +104,12 @@
                                     <div class="mb-3">
                                         <label class="form-label">Longitude</label>
                                         <input type="number" step="any" name="longitude" class="form-control" placeholder="Click on map">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Route Id</label>
+                                        <input type="number" step="any" name="routeId" class="form-control" placeholder="Set route">
                                     </div>
                                 </div>
                             </div>
@@ -147,6 +163,12 @@
                     <div class="mb-3">
                         <label class="form-label" for="stops_lon">Longitude</label>
                         <input type="number" id="stops_lon" name="stops_lon" class="form-control" step="any" required>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label class="form-label">Route Id</label>
+                        <input type="number" step="any" name="routeId" class="form-control" placeholder="Set route">
                     </div>
                 </div>
             </div>
@@ -328,7 +350,7 @@
                                         <input type="number" step="0.01" class="form-control" placeholder="Enter amount">
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <!-- <div class="col-md-4">
                                     <div class="mb-3">
                                         <label class="form-label">Route</label>
                                         <select class="form-select">
@@ -337,7 +359,7 @@
                                             <option>route2</option>
                                         </select>
                                     </div>
-                                </div>
+                                </div> -->
                             </div>
                             <button type="submit" class="btn btn-primary">Add Fare</button>
                         </form>
@@ -389,7 +411,15 @@
         </div>
     </div>
 
-
+    <script src="https://unpkg.com/maplibre-gl@^5.2.0/dist/maplibre-gl.js"></script>
+    <script>
+                                var map = new maplibregl.Map({
+                                    container: 'map', // container id
+                                    style: 'https://maps.gallimap.com/styles/light/style.json', // style URL
+                                    center: [85.3135, 27.7025], // starting position [lng, lat]
+                                    zoom: 15 // starting zoom
+                                });
+                            </script>  
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script src="../admindashboard/dashboard.js"></script>

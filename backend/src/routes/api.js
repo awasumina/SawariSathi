@@ -76,7 +76,7 @@ router.delete('/deleteRoute/:id', async (req, res) => {
   } catch (err) {
       console.error("Error deleting Route:", err.message);
       res.status(500).json({ error: "Error deleting Route" });
-  }
+  } 
 });
 
 

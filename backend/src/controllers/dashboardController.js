@@ -1,31 +1,103 @@
 import supabase from "../config/supabaseClient.js";
 
-//add Stops
+// Add Stops and Associate with Route, Automatically Set Sequence to Last Position
 export const addStopsdb = async (req, res) => {
-    const { stopName, latitude, longitude } = req.body;
+    const { stopName, latitude, longitude, routeId } = req.body;
 
     try {
-        const { error } = await supabase
-            .from('stop')
-           .insert([{
+        // Step 1: Insert the new stop into the 'stops' table
+        const { data: stopData, error: stopError } = await supabase
+            .from('stops')
+            .insert([{
                 stops_name: stopName,  
                 stops_lon: longitude,     
                 stops_lat: latitude   
-            }]); 
+            }])
+            .select('*')  // Ensure it returns the full row including ID
+            .single();  // .single() ensures we get the inserted stop data
 
-        if (error) throw error;
+        if (stopError) throw stopError;
 
-        res.json({ success: true, message: 'Stop added successfully' });
+        // Step 2: Get the route details including 'route_no'
+        const { data: routeData, error: routeError } = await supabase
+            .from('route')
+            .select('id')   // Fetch only the route_no from the route table
+            .eq('id', routeId)  // Filter by the routeId
+            .single();  // Expecting a single route result
+        console.log(routeData);
+        if (routeError) throw routeError;
+
+        // Step 3: Get the last sequence number for the given route
+        const { data: routeStops, error: routeStopsError } = await supabase
+            .from('route_stops')
+            .select('sequence')
+            .eq('route_id', routeId)   // Filter by the specific route
+            .order('sequence', { ascending: false })   // Order by sequence in descending order to get the last stop
+            .limit(1);   // Limit to 1 to get the last sequence only
+            console.log(routeStops);
+        if (routeStopsError) throw routeStopsError;
+
+        // Step 4: Set the sequence for the new stop (next sequence after the last one)
+        const newSequence = routeStops && routeStops.length > 0 ? routeStops[0].sequence + 1 : 1;
+            console.log(newSequence);
+
+        // Step 5: Insert the relation between the stop and route in 'route_stops'
+        const { error: routeStopError } = await supabase
+            .from('route_stops')
+            .insert([{
+                route_id: routeId,        // The route to associate with the stop
+                stops_id: stopData.id, // The ID of the newly added stop
+                sequence: newSequence      // The sequence/order of the stop in the route
+            }]);
+            console.log("Inserting into route_stops:", {
+                route_id: routeId,
+                stops_id: stopData?.id,
+                sequence: newSequence
+            });
+
+            
+            
+        if (routeStopError) throw routeStopError;
+
+        // Step 6: Respond with success and include the route number (optional)
+        res.json({ 
+            success: true, 
+            message: 'Stop added and associated with route successfully',
+            route_no: routeData.route_no  // Including route_no in the response
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
 
+
+// //add Stops
+// export const addStopsdb = async (req, res) => {
+//     const { stopName, latitude, longitude } = req.body;
+
+//     try {
+//         const { error } = await supabase
+//             .from('stops')
+//            .insert([{
+//                 stops_name: stopName,  
+//                 stops_lon: longitude,     
+//                 stops_lat: latitude   
+//             }]); 
+
+//         if (error) throw error;
+
+//         res.json({ success: true, message: 'Stop added successfully' });
+//     } catch (error) {
+//         res.status(500).json({ success: false, message: error.message });
+//     }
+// };
+
+
 // Function to fetch stops from the database
 export const getStopdb =  async (req,res)=>{
     try{
-    const { data, error } = await supabase.from("stop").select("*");
+    const { data, error } = await supabase.from("stops").select("*");
     
     if (error) {
         console.error("Error fetching stops:", error);
@@ -42,7 +114,7 @@ catch(err){
 // Function to delete a stop from the database
 export const deleteStopById = async (id) => {
     try {
-        const { error } = await supabase.from("stop").delete().match({ id });
+        const { error } = await supabase.from("stops").delete().match({ id });
         
         if (error) {
             console.error("Error deleting stop:", error);
@@ -58,7 +130,7 @@ export const deleteStopById = async (id) => {
 export const getStopId = async (req, res) => {
     try {
         const { id } = req.params; // assuming the id is passed as a URL parameter
-        const { data, error } = await supabase.from("stop").select("*").eq("id", id);
+        const { data, error } = await supabase.from("stops").select("*").eq("id", id);
         
         if (error) {
             console.error("Error fetching stop:", error);
@@ -87,7 +159,7 @@ export const updateStopId = async (req, res) => {
     try {
         // Check if the stop exists
         const { data: existingStop, error: fetchError } = await supabase
-            .from("stop")
+            .from("stops")
             .select("*")
             .eq("id", id)
             .single(); // Fetching a single stop by ID
@@ -98,7 +170,7 @@ export const updateStopId = async (req, res) => {
 
         // Update the stop in the database
         const { error } = await supabase
-            .from("stop")
+            .from("stops")
             .update({
                 stops_name: stops_name,
                 stops_lat: stops_lat,
@@ -116,21 +188,35 @@ export const updateStopId = async (req, res) => {
 
 
 
-//addRoutes
 export const addRoutesdb = async (req, res) => {
-    const { routeName, routeNumber} = req.body;
+    const { routeName, routeNumber } = req.body;
 
     try {
-        const { error } = await supabase
+        // Step 1: Insert the new route into the 'route' table
+        const { data: routeData, error: routeError } = await supabase
             .from('route')
-           .insert([{
-                route_name: routeName,  
-                route_no: routeNumber,     
-            }]); 
+            .insert([{ route_name: routeName, route_no: routeNumber }])
+            .select('id')  // Ensure we get the inserted ID
+            .single();
 
-        if (error) throw error;
+        if (routeError) throw routeError;
 
-        res.json({ success: true, message: 'Route added successfully' });
+        const routeId = routeData.route_id;
+
+        // Step 2: Insert three rows into 'route_yatayat' table with yatayat_id as 1, 2, and 3
+        const yatayatEntries = [
+            { route_id: routeId, yatayat_id: 1, vehicle_timing: '08:00 AM' },
+            { route_id: routeId, yatayat_id: 2, vehicle_timing: '12:00 PM' },
+            { route_id: routeId, yatayat_id: 3, vehicle_timing: '05:00 PM' }
+        ];
+
+        const { error: routeYatayatError } = await supabase
+            .from('route_yatayat')
+            .insert(yatayatEntries);
+
+        if (routeYatayatError) throw routeYatayatError;
+
+        res.json({ success: true, message: 'Route and associated yatayat added successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
