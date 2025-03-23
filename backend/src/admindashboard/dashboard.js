@@ -474,11 +474,11 @@ async function fetchRoutes() {
 document.addEventListener('DOMContentLoaded', function () {
     document.querySelector('#fare-form').addEventListener('submit', async function (event) {
         event.preventDefault();
-        const stops_from = document.querySelector('input[name="stops_from"]').value.trim();
-        const stops_to = document.querySelector('input[name="stops_to"]').value.trim();
-        const fare = parseFloat(document.querySelector('input[name="fare"]').value.trim());
+        const stops_from = document.querySelector('input[name="fareFrom"]').value.trim();
+        const stops_to = document.querySelector('input[name="fareTo"]').value.trim();
+        const fare = parseFloat(document.querySelector('input[name="fareAmount"]').value.trim());
         
-        console.log(stops_from, stops_to, fare);
+        // console.log(stops_from, stops_to, fare);
         
         if (!fare || !stops_from || !stops_to) {
             alert("Please fill in all fields.");
@@ -492,7 +492,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 body: JSON.stringify({ stops_from, stops_to, fare })
             });
             
-            console.log(response);
+            // console.log(response);
             
             const result = await response.json();
             if (result.success) {
