@@ -203,19 +203,17 @@ export const getYatayatId = async (req, res) => {
 // };
 
 
-
-
-export const getStopsForRoutes = async (req, res) => {
+export const getStopsForRoutes = async (req, res) => { 
   const { stop1, stop2 } = req.query; // Accept stops as query parameters
 
   try {
     console.log(`Received query for stops: stop1=${stop1}, stop2=${stop2}`);
     
-    // Subquery: Get distinct route IDs where stops_id matches stop1 or stop2
+    // Fetch route IDs where stops_id matches stop1 or stop2
     const { data: routeIds, error: routeError } = await supabase
       .from('route_stops')
-      .select('route_id', { distinct: true })
-      .or(`stops_id.eq.${stop1},stops_id.eq.${stop2}`); // Use `or` for multiple conditions
+      .select('route_id')
+      .in('stops_id', [stop1, stop2]);
 
     if (routeError) {
       console.error('Error fetching route IDs:', routeError.message);
@@ -227,44 +225,61 @@ export const getStopsForRoutes = async (req, res) => {
       return res.status(404).json({ error: 'No routes found for the provided stops.' });
     }
 
-    const routeIdList = routeIds.map((route) => route.route_id);
-    console.log(`Found route IDs: ${routeIdList.join(', ')}`);
+    // Count occurrences of each route_id
+    const groupedRoutes = routeIds.reduce((acc, { route_id }) => {
+      acc[route_id] = (acc[route_id] || 0) + 1;
+      return acc;
+    }, {});
 
-    // Main query: Fetch stops for matching route IDs using table relationships
+    // Select the first route ID that contains both stops
+    const selectedRouteId = Object.entries(groupedRoutes)
+      .find(([_, count]) => count >= 2)?.[0];
+
+    if (!selectedRouteId) {
+      console.log('No single route contains both stops.');
+      return res.status(404).json({ error: 'No single route found containing both stops.' });
+    }
+
+    console.log(`Selected route ID: ${selectedRouteId}`);
+
+    // **Fetch only stops that belong to the selected route**
     const { data: stops, error: stopsError } = await supabase
-      .from('stops')
-      .select('*, route_stops(route_id, stops_id)') // Include related 'route_stops' data
-      .in('route_stops.route_id', routeIdList); // Filter by the route IDs
+      .from('route_stops')
+      .select('stops_id, stops(stops_name, stops_lon, stops_lat)') // Fetch stops details
+      .eq('route_id', selectedRouteId)
+      .order('sequence', { ascending: true }); // Ensure correct stop order
 
     if (stopsError) {
       console.error('Error fetching stops:', stopsError.message);
       throw stopsError;
     }
 
+    // Format stops to return only the necessary details
+    const formattedStops = stops.map(({ stops }) => stops);
 
-     // Fetch fares data
-     const { data: fare, error: fareError } = await supabase
-     .from('fare')
-     .select('*')
-     .eq('stops_from_id', stop1)
-     .eq('stops_to_id', stop2)
-     .single(); // Assuming only one fare exists per route
+    // Fetch fare data
+    const { data: fare, error: fareError } = await supabase
+    .from('fare')
+    .select('*')
+    .in('stops_from_id', [stop1, stop2])
+    .in('stops_to_id', [stop2, stop1])
+    .single(); // Assuming only one fare exists per route
+  
+      console.log(fare);
 
-   if (fareError && fareError.code !== 'PGRST116') { // Ignore "no rows found" error
-     console.error('Error fetching fare:', fareError.message);
-     throw fareError;
-   }
+    if (fareError && fareError.code !== 'PGRST116') { // Ignore "no rows found" error
+      console.error('Error fetching fare:', fareError.message);
+      throw fareError;
+    }
 
-   res.json({ data: { stops, fare } });
+    res.json({ data: { stops: formattedStops, fare } });
 
-
-    // console.log('Fetched stops:', stops);
-    // res.json({ data: stops });
   } catch (err) {
     console.error('Error fetching stops for routes:', err.message);
     res.status(500).json({ error: 'Internal server error', message: err.message });
   }
 };
+
 
 
 

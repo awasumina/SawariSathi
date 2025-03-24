@@ -2,7 +2,7 @@ import express from 'express';
 // import listEndpoints from 'express-list-endpoints'; // Correct import syntax
 
 import {
-  getFare,
+  getFare, 
   getYatayatId,
   getStopsForRoutes,
   getVehicleImage  ,
