@@ -16,7 +16,6 @@ export const getFare = async (req, res) => {
   }
 };
 
-
 export const getAllStops = async (req, res) => {
   try {
     const { data, error } = await supabase.from("stops").select("*"); // Fetch all fare
@@ -58,171 +57,28 @@ export const getYatayatId = async (req, res) => {
   }
 };
 
-
-
-
-// export const getStopsForRoutes = async (req, res) => {
-//   const { stop1, stop2 } = req.query; // Accept stops as query parameters
-//   console.log(stop1, stop2) ;
-// let { data, error } = await supabase
-// .rpc('get_stops_on_common_route', {
-//   "stop_id1": stop1, 
-//   "stop_id2": stop2})
-// if (error) console.error(error)
-// else console.log(data)
-
-
-
-  // try {
-  //   console.log(`Received query for stops: stop1=${stop1}, stop2=${stop2}`);
-    
-  //   // Subquery 1: Get distinct route IDs for stop1
-  //     const {data: routeIdsForStop1, error: routeError1 } = await supabase
-  //     .from('route_stops')
-  //     .select('route_id, stops(id)', { distinct: true })
-  //     .eq('stops_id', stop1);
-
-  //   if (routeError1) {
-  //     console.error('Error fetching route IDs for stop1:', routeError1.message);
-  //     throw routeError1;
-  //   }
-
-  //   // Subquery 2: Get distinct route IDs for stop2
-  //   const {data: routeIdsForStop2, error: routeError2 } = await supabase
-  //     .from('route_stops')
-  //     .select('route_id, stops(id)', { distinct: true })
-  //     .eq('stops_id', stop2);
-      
-
-  //   if (routeError2) {
-  //     console.error('Error fetching route IDs for stop2:', routeError2.message);
-  //     throw routeError2;
-  //   }
-
-  //   if (!routeIdsForStop1.length || !routeIdsForStop2.length) {
-  //     return res.status(404).json({ error: 'No routes found for the provided stops.' });
-  //   }
-
-  //   // Extract route IDs and find the intersection
-  //   const routeIds1 = routeIdsForStop1.map((route) => route.route_id);
-  //   const routeIds2 = routeIdsForStop2.map((route) => route.route_id);
-  //   const commonRouteIds = routeIds1.filter((id) => routeIds2.includes(id));
-
-  //   if (!commonRouteIds.length) {
-  //     console.log('No common routes found.');
-  //     return res.status(404).json({ error: 'No common routes found for the provided stops.' });
-  //   }
-
-  //   console.log(`Found common route IDs: ${commonRouteIds.join(', ')}`);
-
-  //   // Main query: Fetch stops for matching route IDs
-  //   const { data: stops, error: stopsError } = await supabase
-  //     .from('stops')
-  //     .select('*, route_stops(route_id, stops_id)') // Include related 'route_stops' data
-  //     .in('route_stops.route_id', commonRouteIds); // Filter by the common route IDs
-  
-  //   // if (stopsError) {
-  //   //   console.error('Error fetching stops:', stopsError.message);
-  //   //   throw stopsError;
-  //   // }
-
-  //   // console.log('Fetched stops:', stops);
-   
-  //   res.json({ data: stops });
-  // } catch (err) {
-  //   console.error('Error fetching stops for routes:', err.message);
-  //   res.status(500).json({ error: 'Internal server error', message: err.message });
-  // }
-// };
-
-
-
-
-// export const getStopsForRoutes = async (req, res) => {
-//   const { stop1, stop2 } = req.query; // Accept stops as query parameters
-
-//   try {
-//     console.log(`Received query for stops: stop1=${stop1}, stop2=${stop2}`);
-    
-//     // Subquery 1: Get distinct route IDs for stop1
-//     const { data: routeIdsForStop1, error: routeError1 } = await supabase
-//       .from('route_stops')
-//       .select('route_id', { distinct: true })
-//       .eq('stops_id', stop1);
-
-//     if (routeError1) {
-//       console.error('Error fetching route IDs for stop1:', routeError1.message);
-//       throw routeError1;
-//     }
-
-//     // Subquery 2: Get distinct route IDs for stop2
-//     const { data: routeIdsForStop2, error: routeError2 } = await supabase
-//       .from('route_stops')
-//       .select('route_id', { distinct: true })
-//       .eq('stops_id', stop2);
-
-//     if (routeError2) {
-//       console.error('Error fetching route IDs for stop2:', routeError2.message);
-//       throw routeError2;
-//     }
-
-//     if (!routeIdsForStop1.length || !routeIdsForStop2.length) {
-//       console.log('No common routes found.');
-//       return res.status(404).json({ error: 'No routes found for the provided stops.' });
-//     }
-
-//     // Extract route IDs and find the intersection
-//     const routeIds1 = routeIdsForStop1.map((route) => route.route_id);
-//     const routeIds2 = routeIdsForStop2.map((route) => route.route_id);
-//     const commonRouteIds = routeIds1.filter((id) => routeIds2.includes(id));
-
-//     if (!commonRouteIds.length) {
-//       console.log('No common routes found.');
-//       return res.status(404).json({ error: 'No common routes found for the provided stops.' });
-//     }
-
-//     console.log(`Found common route IDs: ${commonRouteIds.join(', ')}`);
-
-//     // Main query: Fetch stops for matching route IDs
-//     const { data: stops, error: stopsError } = await supabase
-//       .from('stops')
-//       .select('*, route_stops(route_id, stops_id)') // Include related 'route_stops' data
-//       .in('route_stops.route_id', commonRouteIds); // Filter by the common route IDs
-
-//     if (stopsError) {
-//       console.error('Error fetching stops:', stopsError.message);
-//       throw stopsError;
-//     }
-
-//     // console.log('Fetched stops:', stops);
-//     res.json({ data: stops });
-//   } catch (err) {
-//     console.error('Error fetching stops for routes:', err.message);
-//     res.status(500).json({ error: 'Internal server error', message: err.message });
-//   }
-// };
-
-
-export const getStopsForRoutes = async (req, res) => { 
+export const getStopsForRoutes = async (req, res) => {
   const { stop1, stop2 } = req.query; // Accept stops as query parameters
 
   try {
     console.log(`Received query for stops: stop1=${stop1}, stop2=${stop2}`);
-    
+
     // Fetch route IDs where stops_id matches stop1 or stop2
     const { data: routeIds, error: routeError } = await supabase
-      .from('route_stops')
-      .select('route_id')
-      .in('stops_id', [stop1, stop2]);
+      .from("route_stops")
+      .select("route_id")
+      .in("stops_id", [stop1, stop2]);
 
     if (routeError) {
-      console.error('Error fetching route IDs:', routeError.message);
+      console.error("Error fetching route IDs:", routeError.message);
       throw routeError;
     }
 
     if (!routeIds || !routeIds.length) {
-      console.log('No route IDs found.');
-      return res.status(404).json({ error: 'No routes found for the provided stops.' });
+      console.log("No route IDs found.");
+      return res
+        .status(404)
+        .json({ error: "No routes found for the provided stops." });
     }
 
     // Count occurrences of each route_id
@@ -232,25 +88,99 @@ export const getStopsForRoutes = async (req, res) => {
     }, {});
 
     // Select the first route ID that contains both stops
-    const selectedRouteId = Object.entries(groupedRoutes)
-      .find(([_, count]) => count >= 2)?.[0];
+    const selectedRouteId = Object.entries(groupedRoutes).find(
+      ([_, count]) => count >= 2
+    )?.[0];
 
     if (!selectedRouteId) {
-      console.log('No single route contains both stops.');
-      return res.status(404).json({ error: 'No single route found containing both stops.' });
+      console.log("No single route contains both stops.");
+      return res
+        .status(404)
+        .json({ error: "No single route found containing both stops." });
     }
 
     console.log(`Selected route ID: ${selectedRouteId}`);
 
-    // **Fetch only stops that belong to the selected route**
+    // // Fetch the yatayat_id associated with the selected route
+    // const { data: routeYatayat, error: routeYatayatError } = await supabase
+    //   .from('route_yatayat')
+    //   .select('yatayat_id')
+    //   .eq('route_id', selectedRouteId)
+    //   // .single(); // Assuming a one-to-one relationship between route and yatayat
+    // console.log(routeYatayat);
+    // if (routeYatayatError) {
+    //   console.error('Error fetching route_yatayat:', routeYatayatError.message);
+    //   throw routeYatayatError;
+    // }
+
+    // if (!routeYatayat) {
+    //   console.log('No yatayat found for the selected route.');
+    //   return res.status(404).json({ error: 'No yatayat associated with the selected route.' });
+    // }
+
+    // const yatayatId = routeYatayat.id;
+    // console.log(yatayatId);
+    const yatayatId = 3;
+
+    // Fetch the vehicle image file path from yatayat table
+    const { data: yatayatData, error: yatayatError } = await supabase
+      .from("yatayat")
+      .select("yatayat_vehicle_image")
+      .eq("id", yatayatId)
+      .single(); // Expecting a single result for this query
+
+    console.log(yatayatData);
+
+    if (yatayatError) {
+      console.error("Error fetching yatayat data:", yatayatError.message);
+      throw yatayatError;
+    }
+
+    if (!yatayatData) {
+      console.log("No yatayat data found for the selected yatayat_id.");
+      return res
+        .status(404)
+        .json({ error: "No vehicle image found for the selected yatayat." });
+    }
+
+    // Clean the file path (removing leading/trailing slashes if present)
+    // let vehicleImageFilePath = yatayatData.yatayat_vehicle_image.trim().replace(/^\/+|\/+$/g, '');
+
+    let vehicleImageFilePath = yatayatData.yatayat_vehicle_image
+      .trim()
+      .replace(/^\/+|\/+$/g, "");
+
+    // Ensure there's no double slash in the URL
+    let vehicleImageUrl = `https://harjukgmkopkziyskpso.supabase.co/storage/v1/object/public/Vehicle/${vehicleImageFilePath.replace(
+      /\/+/g,
+      "/"
+    )}`;
+
+    // console.log('Vehicle Image URL:', vehicleImageUrl);
+
+    // Generate the public URL for the vehicle image
+    const { data: imageUrlData, error: urlError } = supabase.storage
+      .from("Vehicle")
+      .getPublicUrl(vehicleImageFilePath);
+
+    if (urlError) {
+      console.error("Error fetching vehicle image URL:", urlError.message);
+      return res
+        .status(500)
+        .json({ error: "Error fetching vehicle image URL" });
+    }
+
+    // console.log('Vehicle Image URL:', imageUrlData.publicURL);
+
+    // Fetch stops for the selected route
     const { data: stops, error: stopsError } = await supabase
-      .from('route_stops')
-      .select('stops_id, stops(stops_name, stops_lon, stops_lat)') // Fetch stops details
-      .eq('route_id', selectedRouteId)
-      .order('sequence', { ascending: true }); // Ensure correct stop order
+      .from("route_stops")
+      .select("stops_id, stops(stops_name, stops_lon, stops_lat)") // Fetch stops details
+      .eq("route_id", selectedRouteId)
+      .order("sequence", { ascending: true }); // Ensure correct stop order
 
     if (stopsError) {
-      console.error('Error fetching stops:', stopsError.message);
+      console.error("Error fetching stops:", stopsError.message);
       throw stopsError;
     }
 
@@ -259,32 +189,33 @@ export const getStopsForRoutes = async (req, res) => {
 
     // Fetch fare data
     const { data: fare, error: fareError } = await supabase
-    .from('fare')
-    .select('*')
-    .in('stops_from_id', [stop1, stop2])
-    .in('stops_to_id', [stop2, stop1])
-    .single(); // Assuming only one fare exists per route
-  
-      console.log(fare);
+      .from("fare")
+      .select("*")
+      .in("stops_from_id", [stop1, stop2])
+      .in("stops_to_id", [stop2, stop1])
+      .single(); // Assuming only one fare exists per route
 
-    if (fareError && fareError.code !== 'PGRST116') { // Ignore "no rows found" error
-      console.error('Error fetching fare:', fareError.message);
+    if (fareError && fareError.code !== "PGRST116") {
+      // Ignore "no rows found" error
+      console.error("Error fetching fare:", fareError.message);
       throw fareError;
     }
 
-    res.json({ data: { stops: formattedStops, fare } });
-
+    // Return the stops and fare data along with the vehicle image URL
+    res.json({
+      data: {
+        stops: formattedStops,
+        fare,
+        vehicleImageUrl: imageUrlData.publicUrl,
+      },
+    });
   } catch (err) {
-    console.error('Error fetching stops for routes:', err.message);
-    res.status(500).json({ error: 'Internal server error', message: err.message });
+    console.error("Error fetching stops for routes:", err.message);
+    res
+      .status(500)
+      .json({ error: "Internal server error", message: err.message });
   }
 };
-
-
-
-
-
-
 
 // API to fetch image URL dynamically
 export const getVehicleImage = async (req, res) => {
@@ -293,7 +224,9 @@ export const getVehicleImage = async (req, res) => {
     const { bucketName, filePath } = req.query;
 
     if (!bucketName || !filePath) {
-      return res.status(400).json({ error: 'Missing bucketName or filePath in query parameters' });
+      return res
+        .status(400)
+        .json({ error: "Missing bucketName or filePath in query parameters" });
     }
 
     // Generate a public URL for the image
@@ -307,184 +240,38 @@ export const getVehicleImage = async (req, res) => {
 
     res.json({ imageUrl: data.publicUrl });
   } catch (err) {
-    console.error('Error fetching image URL:', err.message);
-    res.status(500).json({ error: 'Error fetching image URL' });
+    console.error("Error fetching image URL:", err.message);
+    res.status(500).json({ error: "Error fetching image URL" });
   }
 };
 
+// // API to fetch image URL dynamically based on vehicle type
+// export const getVehicleImage = async (req, res) => {
+//   try {
+//     // Extract the vehicle type (like Bus, Car, etc.) from the URL parameter
+//     const { vehicleType } = req.query;
 
-
-
-
-
-// // Create a new child account
-// export const createChildAccount = async (req, res) => {
-//     const {
-//       child_id,
-//       gender,
-//       name,
-//       date_of_birth,
-//       weight_at_birth,
-//       mother_name,
-//       father_name,
-//       province,
-//       municipality,
-//       ward_no,
-//       village,
-//       phone,
-//       email,
-//       health_institution_name,
-//       health_worker_assigned,
-//       date_of_card_made,
-//       temporary_password,
-//     } = req.body;
-  
-//     if (
-//       !child_id ||
-//       !gender ||
-//       !name ||
-//       !date_of_birth ||
-//       !mother_name ||
-//       !father_name ||
-//       !province ||
-//       !municipality ||
-//       !ward_no ||
-//       !village ||
-//       !phone ||
-//       !health_institution_name ||
-//       !health_worker_assigned ||
-//       !date_of_card_made ||
-//       !temporary_password
-//     ) {
-//       return res.status(400).json({ error: "All fields are required" });
+//     if (!vehicleType) {
+//       return res.status(400).json({ error: 'Missing vehicleType in query parameters' });
 //     }
-  
-//     try {
-//       const { data, error } = await supabase.from("children").insert([
-//         {
-//           child_id,
-//           gender,
-//           name,
-//           date_of_birth,
-//           weight_at_birth,
-//           mother_name,
-//           father_name,
-//           province,
-//           municipality,
-//           ward_no,
-//           village,
-//           phone,
-//           email,
-//           health_institution_name,
-//           health_worker_assigned,
-//           date_of_card_made,
-//           temporary_password,
-//         },
-//       ]);
-  
-//       res.status(201).json({
-//         message: `Child account ${name} has been created.`,
-//         data: data[0], // Send the first (and only) inserted child
-//       });
-//     } catch (err) {
-//       console.error("Error in try-catch block when adding child:", err); // Log detailed error
-//       res
-//         .status(500)
-//         .json({ error: "Error creating child account", details: err.message }); // Return error with message
+
+//     // Assuming 'vehicles' is the Supabase bucket name, and image file paths are named after vehicle types
+//     const bucketName = 'vehicles';
+//     const filePath = `${vehicleType}.jpg`; // Assuming the images are stored as .jpg (you can change this to the format you're using)
+//     console
+//     // Generate a public URL for the image
+//     const { data, error } = supabase.storage
+//       .from(bucketName)
+//       .getPublicUrl(filePath);
+
+//     if (error) {
+//       throw error;
 //     }
-//   };
 
-
-
-
-
-
-
-// // Update a child account
-// export const updateChildAccount = async (req, res) => {
-//     const { id } = req.params;
-//     const {
-//       child_id,
-//       gender,
-//       name,
-//       date_of_birth,
-//       weight_at_birth,
-//       mother_name,
-//       father_name,
-//       province,
-//       municipality,
-//       ward_no,
-//       village,
-//       phone,
-//       email,
-//       health_institution_name,
-//       health_worker_assigned,
-//       date_of_card_made,
-//       temporary_password,
-//     } = req.body;
-  
-//     try {
-//       const { data, error } = await supabase
-//         .from("children")
-//         .update({
-//           child_id,
-//           gender,
-//           name,
-//           date_of_birth,
-//           weight_at_birth,
-//           mother_name,
-//           father_name,
-//           province,
-//           municipality,
-//           ward_no,
-//           village,
-//           phone,
-//           email,
-//           health_institution_name,
-//           health_worker_assigned,
-//           date_of_card_made,
-//           temporary_password,
-//         })
-//         .eq("child_id", id); // Match by child_id
-  
-//       if (error) {
-//         throw error;
-//       }
-  
-//       if (data.length === 0) {
-//         return res.status(404).json({ error: "Child not found" });
-//       }
-  
-//       res.json({ message: `Child account with ID ${id} has been updated.` });
-//     } catch (err) {
-//       console.error("Error updating child account:", err.message);
-//       res.status(500).json({ error: "Error updating child account" });
-//     }
-//   };
-  
-//   // Delete a child account
-//   export const deleteChildAccount = async (req, res) => {
-//     const { id } = req.params;
-  
-//     try {
-//       const { data, error } = await supabase
-//         .from("children")
-//         .delete()
-//         .eq("child_id", id); // Match by child_id
-  
-//       if (error) {
-//         throw error;
-//       }
-  
-//       if (data.length === 0) {
-//         return res.status(404).json({ error: "Child not found" });
-//       }
-  
-//       res.json({ message: `Child account with ID ${id} has been deleted.` });
-//     } catch (err) {
-//       console.error("Error deleting child account:", err.message);
-//       res.status(500).json({ error: "Error deleting child account" });
-//     }
-//   };
-  
-  
+//     // Respond with the public image URL
+//     res.json({ imageUrl: data.publicUrl });
+//   } catch (err) {
+//     console.error('Error fetching image URL:', err.message);
+//     res.status(500).json({ error: 'Error fetching image URL' });
+//   }
+// };
