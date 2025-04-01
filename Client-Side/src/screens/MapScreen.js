@@ -1,15 +1,15 @@
-import { StyleSheet, Text, View } from 'react-native'
-import React from 'react'
+import { StyleSheet, Text, View } from "react-native";
+import React from "react";
 
 export default function MapScreen() {
   return (
     <View>
       <Text>MapScreen</Text>
     </View>
-  )
+  );
 }
 
-const styles = StyleSheet.create({})
+const styles = StyleSheet.create({});
 
 // import React, { useEffect, useState } from 'react';
 // import { View, Text, StyleSheet, Dimensions } from 'react-native';
@@ -19,7 +19,7 @@ const styles = StyleSheet.create({})
 // const MapScreen = ({ route }) => {
 //   const { fromLocation, toLocation } = route.params;
 //   console.log(fromLocation, toLocation);
-  
+
 //   const [coordinates, setCoordinates] = useState({
 //     from: { latitude: 27.7017, longitude: 85.3206 }, // Default Kathmandu coordinates
 //     to: { latitude: 27.6668, longitude: 85.3250 }, // Default Patan coordinates
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({})
 //         <MapViewDirections
 //   origin={coordinates.from}
 //   destination={coordinates.to}
-//   //apikey="AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao"// Replace this with your actual API key
+//   apikey="AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao" // Replace this with your actual API key
 //   strokeWidth={4}
 //   strokeColor="blue"
 // />

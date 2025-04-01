@@ -24,7 +24,6 @@
 //   const [showFromDropdown, setShowFromDropdown] = useState(false);
 //   const [showToDropdown, setShowToDropdown] = useState(false);
 //   const [loading, setLoading] = useState(false);
-  
 
 //   const [recentSearches] = useState([
 //     { id: '1', from: 'Koteshwor', to: 'Putalisadak', price: 'Rs. 20', distance: '4.3 Km' },
@@ -999,7 +998,6 @@
 //   );
 // };
 
-
 // const styles = StyleSheet.create({
 //     container: {
 //     flex: 1,
@@ -1179,11 +1177,6 @@
 // });
 
 // export default SearchScreen;
-
-
-
-
-
 
 // import React, { useState, useEffect } from 'react';
 // import {
@@ -1553,7 +1546,7 @@
 //       Alert.alert('Error', 'Please select both locations');
 //       return;
 //     }
-    
+
 //     if (fromLocation === toLocation) {
 //       Alert.alert('Error', 'Departure and arrival locations cannot be the same');
 //       return;
@@ -1567,8 +1560,7 @@
 //       const response = await axios.get(
 //         `${API_BASE_URL}/routes/stops?stop1=${fromStop.id}&stop2=${toStop.id}`
 //       );
-      
-      
+
 //       if (!response.data.data || response.data.data.length === 0) {
 //         Alert.alert('No Routes', 'No available routes found for selected stops');
 //         return;
@@ -1599,7 +1591,7 @@
 //               <Ionicons name="close" size={24} color="#000" />
 //             </TouchableOpacity>
 //           </View>
-          
+
 //           <View style={styles.searchContainer}>
 //             <TextInput
 //               style={styles.searchInput}
@@ -1869,7 +1861,7 @@
 // });
 
 // export default SearchScreen;
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   SafeAreaView,
   View,
@@ -1884,42 +1876,42 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 
-const { width, height } = Dimensions.get('window');
-const API_BASE_URL = 'http://192.168.137.207:3000/api';
+const { width, height } = Dimensions.get("window");
+const API_BASE_URL = "http://192.168.1.69:3000/api";
 
 const SearchScreen = ({ navigation }) => {
-  const [fromLocation, setFromLocation] = useState('');
-  const [toLocation, setToLocation] = useState('');
+  const [fromLocation, setFromLocation] = useState("");
+  const [toLocation, setToLocation] = useState("");
   const [showFromDropdown, setShowFromDropdown] = useState(false);
   const [showToDropdown, setShowToDropdown] = useState(false);
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const fetchLocations = async () => {
       try {
         const res = await axios.get(`${API_BASE_URL}/stops`);
         const uniqueLocations = res.data.data.reduce((acc, current) => {
-          if (!acc.find(item => item.name === current.stops_name)) {
+          if (!acc.find((item) => item.name === current.stops_name)) {
             acc.push({
               id: current.id,
               name: current.stops_name,
               lat: current.stops_lat,
-              lon: current.stops_lon
+              lon: current.stops_lon,
             });
           }
           return acc;
         }, []);
         setLocations(uniqueLocations);
       } catch (error) {
-        console.error('Locations fetch error:', error);
-        Alert.alert('Error', 'Failed to load locations. Please try again.');
+        console.error("Locations fetch error:", error);
+        Alert.alert("Error", "Failed to load locations. Please try again.");
       } finally {
         setInitialLoading(false);
       }
@@ -1928,7 +1920,7 @@ const SearchScreen = ({ navigation }) => {
     fetchLocations();
   }, []);
 
-  const filteredLocations = locations.filter(location =>
+  const filteredLocations = locations.filter((location) =>
     location.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -1936,66 +1928,81 @@ const SearchScreen = ({ navigation }) => {
     return {
       id: apiData.fare?.route_yatayat_id || Math.random(),
       vehicle: {
-        type: 'Bus', // Default value, update with actual API data
-        name: `Route ${apiData.fare?.route_yatayat_id || ''}`,
+        type: "Bus", // Default value, update with actual API data
+        name: `Route ${apiData.fare?.route_yatayat_id || ""}`,
         count: 5, // Default value
       },
       fare: apiData.fare?.fare || 0,
       discountedFare: apiData.fare?.discounted_fare || 0,
       stops: apiData.stops,
       distance: calculateDistance(apiData.stops), // Implement your distance calculation
-      estimatedTime: '06:00 AM - 08:00 PM' // Update with actual timing data
+      estimatedTime: "06:00 AM - 08:00 PM", // Update with actual timing data
     };
   };
 
   const calculateDistance = (stops) => {
     // Implement your distance calculation logic here
-    return '4.3'; // Sample distance
+    return "4.3"; // Sample distance
   };
 
   const handleSearch = async () => {
     if (!fromLocation || !toLocation) {
-      Alert.alert('Error', 'Please select both locations');
+      Alert.alert("Error", "Please select both locations");
       return;
     }
-    
+
     if (fromLocation === toLocation) {
-      Alert.alert('Error', 'Departure and arrival locations cannot be the same');
+      Alert.alert(
+        "Error",
+        "Departure and arrival locations cannot be the same"
+      );
       return;
     }
 
     setLoading(true);
     try {
-      const fromStop = locations.find(stop => stop.name === fromLocation);
-      const toStop = locations.find(stop => stop.name === toLocation);
+      const fromStop = locations.find((stop) => stop.name === fromLocation);
+      const toStop = locations.find((stop) => stop.name === toLocation);
 
       const response = await axios.get(
         `${API_BASE_URL}/routes/stops?stop1=${fromStop.id}&stop2=${toStop.id}`
       );
-      
+
       if (!response.data.data) {
-        Alert.alert('No Routes', 'No available routes found for selected stops');
+        Alert.alert(
+          "No Routes",
+          "No available routes found for selected stops"
+        );
         return;
       }
 
       const transformedData = transformRouteData(response.data.data);
 
-      navigation.navigate('SearchResults', {
+      navigation.navigate("SearchResults", {
         results: [transformedData],
         fromLocation,
-        toLocation
+        toLocation,
       });
     } catch (error) {
-      console.error('Search error:', error);
-      Alert.alert('Error', 'Failed to fetch routes. Please try again later.');
+      console.error("Search error:", error);
+      Alert.alert("Error", "Failed to fetch routes. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
   const LocationDropdown = ({ visible, onClose, onSelect, currentValue }) => (
-    <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
         <View style={styles.dropdownContainer}>
           <View style={styles.dropdownHeader}>
             <Text style={styles.dropdownTitle}>Select Location</Text>
@@ -2003,7 +2010,7 @@ const SearchScreen = ({ navigation }) => {
               <Ionicons name="close" size={24} color="#000" />
             </TouchableOpacity>
           </View>
-          
+
           <View style={styles.searchContainer}>
             <TextInput
               style={styles.searchInput}
@@ -2025,11 +2032,11 @@ const SearchScreen = ({ navigation }) => {
                   key={location.id}
                   style={[
                     styles.dropdownItem,
-                    currentValue === location.name && styles.selectedItem
+                    currentValue === location.name && styles.selectedItem,
                   ]}
                   onPress={() => {
                     onSelect(location.name);
-                    setSearchQuery('');
+                    setSearchQuery("");
                     onClose();
                   }}
                 >
@@ -2037,7 +2044,9 @@ const SearchScreen = ({ navigation }) => {
                     <Ionicons
                       name="location-sharp"
                       size={20}
-                      color={currentValue === location.name ? '#007AFF' : '#666'}
+                      color={
+                        currentValue === location.name ? "#007AFF" : "#666"
+                      }
                     />
                     <Text style={styles.locationName}>{location.name}</Text>
                   </View>
@@ -2057,7 +2066,7 @@ const SearchScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <ImageBackground
-        source={require('../../assets/cityy.png')}
+        source={require("../../assets/cityy.png")}
         style={styles.headerBackground}
       >
         <View style={styles.overlay}>
@@ -2073,13 +2082,18 @@ const SearchScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.locationInput}
             onPress={() => {
-              setSearchQuery('');
+              setSearchQuery("");
               setShowFromDropdown(true);
             }}
           >
             <Ionicons name="location" size={20} color="#666" />
-            <Text style={[styles.inputText, !fromLocation && styles.placeholderText]}>
-              {fromLocation || 'Select departure point'}
+            <Text
+              style={[
+                styles.inputText,
+                !fromLocation && styles.placeholderText,
+              ]}
+            >
+              {fromLocation || "Select departure point"}
             </Text>
             <Ionicons name="chevron-down" size={20} color="#666" />
           </TouchableOpacity>
@@ -2087,13 +2101,15 @@ const SearchScreen = ({ navigation }) => {
           <TouchableOpacity
             style={styles.locationInput}
             onPress={() => {
-              setSearchQuery('');
+              setSearchQuery("");
               setShowToDropdown(true);
             }}
           >
             <Ionicons name="location" size={20} color="#666" />
-            <Text style={[styles.inputText, !toLocation && styles.placeholderText]}>
-              {toLocation || 'Select destination'}
+            <Text
+              style={[styles.inputText, !toLocation && styles.placeholderText]}
+            >
+              {toLocation || "Select destination"}
             </Text>
             <Ionicons name="chevron-down" size={20} color="#666" />
           </TouchableOpacity>
@@ -2116,7 +2132,7 @@ const SearchScreen = ({ navigation }) => {
         <TouchableOpacity
           style={[
             styles.searchButton,
-            (!fromLocation || !toLocation) && styles.searchButtonDisabled
+            (!fromLocation || !toLocation) && styles.searchButtonDisabled,
           ]}
           disabled={!fromLocation || !toLocation || loading}
           onPress={handleSearch}
@@ -2135,7 +2151,7 @@ const SearchScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
   },
   headerBackground: {
     height: height * 0.25,
@@ -2143,24 +2159,24 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#fff",
+    textAlign: "center",
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#fff',
+    color: "#fff",
     marginTop: 8,
   },
   content: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     marginTop: -20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -2168,7 +2184,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
     marginBottom: 20,
   },
   inputsContainer: {
@@ -2176,94 +2192,94 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   locationInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     borderRadius: 12,
     gap: 12,
   },
   inputText: {
     flex: 1,
     fontSize: 16,
-    color: '#000',
+    color: "#000",
   },
   placeholderText: {
-    color: '#666',
+    color: "#666",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
   dropdownContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: height * 0.7,
   },
   dropdownHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   dropdownTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   dropdownList: {
     padding: 16,
   },
   dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
   selectedItem: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
   },
   locationInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   locationName: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   searchButton: {
-    backgroundColor: '#ff6b00',
+    backgroundColor: "#ff6b00",
     borderRadius: 12,
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 24,
   },
   searchButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: "#ccc",
   },
   searchButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   loadingContainer: {
     padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   searchContainer: {
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: "#eee",
   },
   searchInput: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
