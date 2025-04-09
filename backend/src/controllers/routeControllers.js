@@ -172,20 +172,56 @@ export const getStopsForRoutes = async (req, res) => {
 
     // console.log('Vehicle Image URL:', imageUrlData.publicURL);
 
-    // Fetch stops for the selected route
-    const { data: stops, error: stopsError } = await supabase
+    // // Fetch stops for the selected route
+    // const { data: stops, error: stopsError } = await supabase
+    //   .from("route_stops")
+    //   .select("stops_id, stops(stops_name, stops_lon, stops_lat)") // Fetch stops details
+    //   .eq("route_id", selectedRouteId)
+    //   .order("sequence", { ascending: true }); // Ensure correct stop order
+
+    // if (stopsError) {
+    //   console.error("Error fetching stops:", stopsError.message);
+    //   throw stopsError;
+    // }
+
+    // // Format stops to return only the necessary details
+    // const formattedStops = stops.map(({ stops }) => stops);
+
+    // Fetch all stops for the selected route ordered by sequence
+    const { data: allStops, error: stopsError } = await supabase
       .from("route_stops")
-      .select("stops_id, stops(stops_name, stops_lon, stops_lat)") // Fetch stops details
+      .select("stops_id, sequence, stops(stops_name, stops_lon, stops_lat)")
       .eq("route_id", selectedRouteId)
-      .order("sequence", { ascending: true }); // Ensure correct stop order
+      .order("sequence", { ascending: true });
 
     if (stopsError) {
       console.error("Error fetching stops:", stopsError.message);
       throw stopsError;
     }
 
-    // Format stops to return only the necessary details
-    const formattedStops = stops.map(({ stops }) => stops);
+    // Find the sequence numbers of stop1 and stop2
+    const stop1Index = allStops.findIndex(
+      (s) => String(s.stops_id) === String(stop1)
+    );
+    const stop2Index = allStops.findIndex(
+      (s) => String(s.stops_id) === String(stop2)
+    );
+    console.log("All Stops:", allStops);
+
+    console.log("Stop1 Index:", stop1Index);
+    console.log("Stop2 Index:", stop2Index);
+
+    if (stop1Index === -1 || stop2Index === -1) {
+      return res.status(404).json({ error: "Stops not found in the route." });
+    }
+
+    // Determine the slice range (inclusive)
+    const [start, end] = [stop1Index, stop2Index].sort((a, b) => a - b);
+    const selectedStops = allStops.slice(start, end + 1);
+    // console.log("Selected stops:", selectedStops);
+
+    // Format the stops
+    const formattedStops = selectedStops.map(({ stops }) => stops);
 
     // Fetch fare data
     const { data: fare, error: fareError } = await supabase
