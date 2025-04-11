@@ -143,49 +143,28 @@ export const getStopsForRoutes = async (req, res) => {
         .json({ error: "No vehicle image found for the selected yatayat." });
     }
 
-    // Clean the file path (removing leading/trailing slashes if present)
-    // let vehicleImageFilePath = yatayatData.yatayat_vehicle_image.trim().replace(/^\/+|\/+$/g, '');
+    // Directly use the value like 'bus', 'microbus', etc.
+    const vehicleType = yatayatData.yatayat_vehicle_image.trim();
 
-    let vehicleImageFilePath = yatayatData.yatayat_vehicle_image
-      .trim()
-      .replace(/^\/+|\/+$/g, "");
+    // let vehicleImageFilePath = yatayatData.yatayat_vehicle_image
+    //   .trim()
+    //   .replace(/^\/+|\/+$/g, "");
 
-    // Ensure there's no double slash in the URL
-    let vehicleImageUrl = `https://harjukgmkopkziyskpso.supabase.co/storage/v1/object/public/Vehicle/${vehicleImageFilePath.replace(
-      /\/+/g,
-      "/"
-    )}`;
+    // let vehicleImageUrl = `https://harjukgmkopkziyskpso.supabase.co/storage/v1/object/public/Vehicle/${vehicleImageFilePath.replace(
+    //   /\/+/g,
+    //   "/"
+    // )}`;
 
-    // console.log('Vehicle Image URL:', vehicleImageUrl);
+    // const { data: imageUrlData, error: urlError } = supabase.storage
+    //   .from("Vehicle")
+    //   .getPublicUrl(vehicleImageFilePath);
 
-    // Generate the public URL for the vehicle image
-    const { data: imageUrlData, error: urlError } = supabase.storage
-      .from("Vehicle")
-      .getPublicUrl(vehicleImageFilePath);
-
-    if (urlError) {
-      console.error("Error fetching vehicle image URL:", urlError.message);
-      return res
-        .status(500)
-        .json({ error: "Error fetching vehicle image URL" });
-    }
-
-    // console.log('Vehicle Image URL:', imageUrlData.publicURL);
-
-    // // Fetch stops for the selected route
-    // const { data: stops, error: stopsError } = await supabase
-    //   .from("route_stops")
-    //   .select("stops_id, stops(stops_name, stops_lon, stops_lat)") // Fetch stops details
-    //   .eq("route_id", selectedRouteId)
-    //   .order("sequence", { ascending: true }); // Ensure correct stop order
-
-    // if (stopsError) {
-    //   console.error("Error fetching stops:", stopsError.message);
-    //   throw stopsError;
+    // if (urlError) {
+    //   console.error("Error fetching vehicle image URL:", urlError.message);
+    //   return res
+    //     .status(500)
+    //     .json({ error: "Error fetching vehicle image URL" });
     // }
-
-    // // Format stops to return only the necessary details
-    // const formattedStops = stops.map(({ stops }) => stops);
 
     // Fetch all stops for the selected route ordered by sequence
     const { data: allStops, error: stopsError } = await supabase
@@ -242,7 +221,8 @@ export const getStopsForRoutes = async (req, res) => {
       data: {
         stops: formattedStops,
         fare,
-        vehicleImageUrl: imageUrlData.publicUrl,
+        vehicleType,
+        // vehicleImageUrl: imageUrlData.publicUrl,
       },
     });
   } catch (err) {
