@@ -1,15 +1,22 @@
-header {
+/* header {
     background-color: #005f99;
     color: white;
     padding: 20px;
     text-align: center;
-  }
+  } */
 body {
 font-family: Arial, sans-serif;
 margin: 0;
 padding: 0;
 background-color: #f9f9f9;
 color: #333;
+}
+
+header {
+  background: linear-gradient(to bottom, #dedcdc,#eeeaea, #f9f9f9);
+  color: rgb(61, 54, 54);
+  padding: 20px;
+  text-align: center;
 }
 
 form {
@@ -42,7 +49,7 @@ form input {
   
   form .btn {
     padding: 10px;
-    background-color: #005f99;
+    background-color: #575757;
     color: white;
     font-size: 1rem;
     border: none;
@@ -56,7 +63,7 @@ form input {
   }
 
   footer {
-    background-color: #005f99;
+    background-color: #838383;
     color: white;
     text-align: center;
     padding: 10px;
