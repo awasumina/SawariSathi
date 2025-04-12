@@ -22,16 +22,12 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   padding: 1rem 0;
   background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
-  /* background-color:  #005f99; */
-
 }
 
 .navbar-brand {
   font-weight: 600;
   font-size: 1.25rem;
   color: white !important;
-  background-color:  #005f99;
-
 }
 
 /* Container Spacing */
