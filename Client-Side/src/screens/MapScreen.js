@@ -2,8 +2,8 @@ import React, { useEffect, useState } from "react";
 import { View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 
-import { GOOGLE_MAPS_API_KEY } from "@env";
-// const GOOGLE_MAPS_API_KEY = "";
+import { GOOGLE_MAPS_API_KEY } from "@env"; // Ensure you have this in your .env file
+// import { GOOGLE_MAPS_API_KEY } from "../config/keys"; // Adjust the import path as necessary
 
 export default function MapScreen({ route, navigation }) {
   const [routeCoords, setRouteCoords] = useState([]);
