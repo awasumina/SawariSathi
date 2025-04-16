@@ -30,153 +30,139 @@ export const getStopsForRoutes = async (req, res) => {
       return acc;
     }, {});
 
-    // Select the first route ID that contains both stops
-    const selectedRouteId = Object.entries(groupedRoutes).find(
-      ([_, count]) => count >= 2
-    )?.[0];
+    // Find all route IDs that contain both stops
+    const matchingRouteIds = Object.entries(groupedRoutes)
+      .filter(([_, count]) => count >= 2)
+      .map(([routeId, _]) => routeId);
 
-    if (!selectedRouteId) {
-      console.log("No single route contains both stops.");
+    if (!matchingRouteIds.length) {
+      console.log("No routes contain both stops.");
       return res
         .status(404)
-        .json({ error: "No single route found containing both stops." });
+        .json({ error: "No routes found containing both stops." });
     }
 
-    console.log(`Selected route ID: ${selectedRouteId}`);
+    console.log(`Matching route IDs: ${matchingRouteIds}`);
 
-    // Fetch the route_no from the route table using selectedRouteId
-const { data: routeData, error: routeDataError } = await supabase
-.from("route")
-.select("route_no")
-.eq("id", selectedRouteId)
-.single(); // Assuming route_id is unique in the route table
-
-if (routeDataError) {
-console.error("Error fetching route_no:", routeDataError.message);
-throw routeDataError;
-}
-const routeNo = routeData.route_no; // Extract the route_no from the response
-console.log("Route No for selected route:", routeData.route_no);
-
-
-    // Fetch the yatayat_id associated with the selected route
-    const { data: routeYatayat, error: routeYatayatError } = await supabase
-      .from("route_yatayat")
-      .select("yatayat_id")
-      .eq("route_id", selectedRouteId);
-    // .single(); // Assuming a one-to-one relationship between route and yatayat
-    console.log("selected", selectedRouteId);
-    console.log(" route yatayat", routeYatayat);
-    if (routeYatayatError) {
-      console.error("Error fetching route_yatayat:", routeYatayatError.message);
-      throw routeYatayatError;
-    }
-
-    if (!routeYatayat) {
-      console.log("No yatayat found for the selected route.");
-      return res
-        .status(404)
-        .json({ error: "No yatayat associated with the selected route." });
-    }
-
-    // const yatayatId = routeYatayat.yatayat_id;
-    const yatayatIds = routeYatayat.map((item) => item.yatayat_id);
-    console.log("All Yatayat IDs:", yatayatIds);
-
-    console.log("yatayatIDs", yatayatIds);
-
-    // Fetch the vehicle image file path from yatayat table
-    const { data: yatayatData, error: yatayatError } = await supabase
-      .from("yatayat")
-      .select("yatayat_vehicle_image")
-      .in("id", yatayatIds);
-    // .eq("id", yatayatIds)
-
-    console.log("yayayat Data", yatayatData);
-
-    if (yatayatError) {
-      console.error("Error fetching yatayat data:", yatayatError.message);
-      throw yatayatError;
-    }
-
-    if (!yatayatData) {
-      console.log("No yatayat data found for the selected yatayat_id.");
-      return res
-        .status(404)
-        .json({ error: "No vehicle image found for the selected yatayat." });
-    }
-
-    // Directly use the value like 'bus', 'microbus', etc.
-    // Map yatayat ID to vehicle image
-    const yatayatMap = yatayatData.reduce((acc, curr, idx) => {
-      acc[yatayatIds[idx]] = curr.yatayat_vehicle_image;
-      return acc;
-    }, {});
-
-    // Fetch all stops for the selected route ordered by sequence
-    const { data: allStops, error: stopsError } = await supabase
-      .from("route_stops")
-      .select("stops_id, sequence, stops(stops_name, stops_lon, stops_lat)")
-      .eq("route_id", selectedRouteId)
-      .order("sequence", { ascending: true });
-
-    if (stopsError) {
-      console.error("Error fetching stops:", stopsError.message);
-      throw stopsError;
-    }
-
-    // Find the sequence numbers of stop1 and stop2
-    const stop1Index = allStops.findIndex(
-      (s) => String(s.stops_id) === String(stop1)
-    );
-    const stop2Index = allStops.findIndex(
-      (s) => String(s.stops_id) === String(stop2)
-    );
-    console.log("All Stops:", allStops);
-
-    console.log("Stop1 Index:", stop1Index);
-    console.log("Stop2 Index:", stop2Index);
-
-    if (stop1Index === -1 || stop2Index === -1) {
-      return res.status(404).json({ error: "Stops not found in the route." });
-    }
-
-    // Determine the slice range (inclusive)
-    const [start, end] = [stop1Index, stop2Index].sort((a, b) => a - b);
-    const selectedStops = allStops.slice(start, end + 1);
-    // console.log("Selected stops:", selectedStops);
-
-    // Format the stops
-    const formattedStops = selectedStops.map(({ stops }) => stops);
-
-    // Fetch fare for each yatayat (same fare for all since route is same)
-    const yatayatDetails = await Promise.all(
-      yatayatIds.map(async (id) => {
-        const { data: fareData, error: fareError } = await supabase
-          .from("fare")
-          .select("*")
-          .in("stops_from_id", [stop1, stop2])
-          .in("stops_to_id", [stop2, stop1])
+    const allRouteDetails = await Promise.all(
+      matchingRouteIds.map(async (selectedRouteId) => {
+        // Fetch the route_no and route_name from the route table
+        const { data: routeData, error: routeDataError } = await supabase
+          .from("route")
+          .select("route_no, route_name")
+          .eq("id", selectedRouteId)
           .single();
-    
-        if (fareError && fareError.code !== "PGRST116") {
-          console.error(`Fare error for yatayat_id ${id}:`, fareError.message);
+
+        if (routeDataError) {
+          console.error("Error fetching route data:", routeDataError.message);
+          throw routeDataError;
         }
-    
+
+        // Fetch the yatayat_id associated with the selected route
+        const { data: routeYatayat, error: routeYatayatError } = await supabase
+          .from("route_yatayat")
+          .select("yatayat_id")
+          .eq("route_id", selectedRouteId);
+
+        if (routeYatayatError) {
+          console.error(
+            "Error fetching route_yatayat:",
+            routeYatayatError.message
+          );
+          throw routeYatayatError;
+        }
+
+        if (!routeYatayat || routeYatayat.length === 0) {
+          return null; // Skip this route
+        }
+
+        const yatayatIds = routeYatayat.map((item) => item.yatayat_id);
+
+        // Fetch the vehicle image file path from yatayat table
+        const { data: yatayatData, error: yatayatError } = await supabase
+          .from("yatayat")
+          .select("id, yatayat_vehicle_image")
+          .in("id", yatayatIds);
+
+        if (yatayatError) {
+          console.error("Error fetching yatayat data:", yatayatError.message);
+          throw yatayatError;
+        }
+
+        const yatayatMap = yatayatData.reduce((acc, curr) => {
+          acc[curr.id] = curr.yatayat_vehicle_image;
+          return acc;
+        }, {});
+
+        // Fetch all stops for the selected route ordered by sequence
+        const { data: allStops, error: stopsError } = await supabase
+          .from("route_stops")
+          .select("stops_id, sequence, stops(stops_name, stops_lon, stops_lat)")
+          .eq("route_id", selectedRouteId)
+          .order("sequence", { ascending: true });
+
+        if (stopsError) {
+          console.error("Error fetching stops:", stopsError.message);
+          throw stopsError;
+        }
+
+        const stop1Index = allStops.findIndex(
+          (s) => String(s.stops_id) === String(stop1)
+        );
+        const stop2Index = allStops.findIndex(
+          (s) => String(s.stops_id) === String(stop2)
+        );
+
+        if (stop1Index === -1 || stop2Index === -1) {
+          return null; // Skip this route
+        }
+
+        const [start, end] = [stop1Index, stop2Index].sort((a, b) => a - b);
+        const selectedStops = allStops.slice(start, end + 1);
+        const formattedStops = selectedStops.map(({ stops }) => stops);
+
+        // Get fare for each yatayat (can be expanded later to specific fare handling)
+        const yatayatDetails = await Promise.all(
+          yatayatIds.map(async (id) => {
+            const { data: fareData, error: fareError } = await supabase
+              .from("fare")
+              .select("*")
+              .in("stops_from_id", [stop1, stop2])
+              .in("stops_to_id", [stop2, stop1])
+              .single();
+
+            if (fareError && fareError.code !== "PGRST116") {
+              console.error(
+                `Fare error for yatayat_id ${id}:`,
+                fareError.message
+              );
+            }
+
+            return {
+              yatayat_id: id,
+              vehicleType: yatayatMap[id],
+              fare: fareData || null,
+              stops: formattedStops,
+              route_no: routeData.route_no,
+              route_name: routeData.route_name,
+            };
+          })
+        );
+
+        // Return the updated response with route_no and route_name at the top level
         return {
-          yatayat_id: id,
-          vehicleType: yatayatMap[id],
-          fare: fareData || null,
-          stops: formattedStops,
-          route_no: routeNo, 
+          routeId: selectedRouteId,
+          route_no: routeData.route_no,
+          route_name: routeData.route_name,
+          details: yatayatDetails,
         };
       })
     );
-    
-    // Final response
-    res.json({
-      data: yatayatDetails,
-    });
+
+    // Filter out null values (e.g., routes with missing data)
+    const filteredResults = allRouteDetails.filter((r) => r !== null);
+
+    res.json({ data: filteredResults });
   } catch (err) {
     console.error("Error fetching stops for routes:", err.message);
     res
@@ -184,6 +170,7 @@ console.log("Route No for selected route:", routeData.route_no);
       .json({ error: "Internal server error", message: err.message });
   }
 };
+
 
 // Get all fare
 export const getFare = async (req, res) => {
