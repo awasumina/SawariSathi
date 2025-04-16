@@ -1,0 +1,20 @@
+
+    // let vehicleImageFilePath = yatayatData.yatayat_vehicle_image
+    //   .trim()
+    //   .replace(/^\/+|\/+$/g, "");
+
+    // let vehicleImageUrl = `https://harjukgmkopkziyskpso.supabase.co/storage/v1/object/public/Vehicle/${vehicleImageFilePath.replace(
+    //   /\/+/g,
+    //   "/"
+    // )}`;
+
+    // const { data: imageUrlData, error: urlError } = supabase.storage
+    //   .from("Vehicle")
+    //   .getPublicUrl(vehicleImageFilePath);
+
+    // if (urlError) {
+    //   console.error("Error fetching vehicle image URL:", urlError.message);
+    //   return res
+    //     .status(500)
+    //     .json({ error: "Error fetching vehicle image URL" });
+    // }

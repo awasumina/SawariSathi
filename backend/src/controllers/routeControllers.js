@@ -1,62 +1,5 @@
 import supabase from "../config/supabaseClient.js";
 
-// Get all fare
-export const getFare = async (req, res) => {
-  try {
-    const { data, error } = await supabase.from("fare").select("*"); // Fetch all fare
-
-    if (error) {
-      throw error;
-    }
-
-    res.json({ data });
-  } catch (err) {
-    console.error("Error fetching fare:", err.message);
-    res.status(500).json({ error: "Error fetching fare" });
-  }
-};
-
-export const getAllStops = async (req, res) => {
-  try {
-    const { data, error } = await supabase.from("stops").select("*"); // Fetch all fare
-
-    if (error) {
-      throw error;
-    }
-
-    res.json({ data });
-  } catch (err) {
-    console.error("Error fetching stops:", err.message);
-    res.status(500).json({ error: "Error fetching stops" });
-  }
-};
-
-// Get yatayat
-export const getYatayatId = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const { data, error } = await supabase
-      .from("yatayat")
-      .select("*")
-      .eq("id", id) // Match by id
-      .single(); // Expect a single record
-
-    if (error) {
-      throw error;
-    }
-
-    if (!data) {
-      return res.status(404).json({ error: "yatayat not found" });
-    }
-
-    res.json({ data });
-  } catch (err) {
-    console.error("Error fetching yatayat:", err.message);
-    res.status(500).json({ error: "Error fetching yatayat" });
-  }
-};
-
 export const getStopsForRoutes = async (req, res) => {
   const { stop1, stop2 } = req.query; // Accept stops as query parameters
 
@@ -131,10 +74,10 @@ export const getStopsForRoutes = async (req, res) => {
     const { data: yatayatData, error: yatayatError } = await supabase
       .from("yatayat")
       .select("yatayat_vehicle_image")
-      .eq("id", yatayatIds)
-      .single(); // Expecting a single result for this query
+      .in("id", yatayatIds);
+    // .eq("id", yatayatIds)
 
-    console.log(yatayatData);
+    console.log("yayayat Data", yatayatData);
 
     if (yatayatError) {
       console.error("Error fetching yatayat data:", yatayatError.message);
@@ -149,27 +92,11 @@ export const getStopsForRoutes = async (req, res) => {
     }
 
     // Directly use the value like 'bus', 'microbus', etc.
-    const vehicleType = yatayatData.yatayat_vehicle_image.trim();
-
-    // let vehicleImageFilePath = yatayatData.yatayat_vehicle_image
-    //   .trim()
-    //   .replace(/^\/+|\/+$/g, "");
-
-    // let vehicleImageUrl = `https://harjukgmkopkziyskpso.supabase.co/storage/v1/object/public/Vehicle/${vehicleImageFilePath.replace(
-    //   /\/+/g,
-    //   "/"
-    // )}`;
-
-    // const { data: imageUrlData, error: urlError } = supabase.storage
-    //   .from("Vehicle")
-    //   .getPublicUrl(vehicleImageFilePath);
-
-    // if (urlError) {
-    //   console.error("Error fetching vehicle image URL:", urlError.message);
-    //   return res
-    //     .status(500)
-    //     .json({ error: "Error fetching vehicle image URL" });
-    // }
+    // Map yatayat ID to vehicle image
+    const yatayatMap = yatayatData.reduce((acc, curr, idx) => {
+      acc[yatayatIds[idx]] = curr.yatayat_vehicle_image;
+      return acc;
+    }, {});
 
     // Fetch all stops for the selected route ordered by sequence
     const { data: allStops, error: stopsError } = await supabase
@@ -207,35 +134,119 @@ export const getStopsForRoutes = async (req, res) => {
     // Format the stops
     const formattedStops = selectedStops.map(({ stops }) => stops);
 
-    // Fetch fare data
-    const { data: fare, error: fareError } = await supabase
-      .from("fare")
-      .select("*")
-      .in("stops_from_id", [stop1, stop2])
-      .in("stops_to_id", [stop2, stop1])
-      .single(); // Assuming only one fare exists per route
+    // // Fetch fare data
+    // const { data: fare, error: fareError } = await supabase
+    //   .from("fare")
+    //   .select("*")
+    //   .in("stops_from_id", [stop1, stop2])
+    //   .in("stops_to_id", [stop2, stop1])
+    //   .single(); // Assuming only one fare exists per route
 
-    if (fareError && fareError.code !== "PGRST116") {
-      // Ignore "no rows found" error
-      console.error("Error fetching fare:", fareError.message);
-      throw fareError;
-    }
+    // if (fareError && fareError.code !== "PGRST116") {
+    //   // Ignore "no rows found" error
+    //   console.error("Error fetching fare:", fareError.message);
+    //   throw fareError;
+    // }
 
-    // Return the stops and fare data along with the vehicle image URL
+    // // Return the stops and fare data along with the vehicle image URL
+    // res.json({
+    //   data: {
+    //     stops: formattedStops,
+    //     fare,
+    //     vehicleType,
+    //     yatayatIds,
+    //     // vehicleImageUrl: imageUrlData.publicUrl,
+    //   },
+    // });
+    // Fetch fare for each yatayat (same fare for all since route is same)
+    const yatayatDetails = await Promise.all(
+      yatayatIds.map(async (id) => {
+        const { data: fareData, error: fareError } = await supabase
+          .from("fare")
+          .select("*")
+          .in("stops_from_id", [stop1, stop2])
+          .in("stops_to_id", [stop2, stop1])
+          .single(); // still assuming one fare per direction
+
+        if (fareError && fareError.code !== "PGRST116") {
+          console.error(`Fare error for yatayat_id ${id}:`, fareError.message);
+        }
+
+        return {
+          yatayat_id: id,
+          vehicleType: yatayatMap[id],
+          fare: fareData || null,
+          stops: formattedStops,
+        };
+      })
+    );
+
+    // Final response
     res.json({
-      data: {
-        stops: formattedStops,
-        fare,
-        vehicleType,
-        yatayatIds,
-        // vehicleImageUrl: imageUrlData.publicUrl,
-      },
+      data: yatayatDetails,
     });
   } catch (err) {
     console.error("Error fetching stops for routes:", err.message);
     res
       .status(500)
       .json({ error: "Internal server error", message: err.message });
+  }
+};
+
+// Get all fare
+export const getFare = async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("fare").select("*"); // Fetch all fare
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ data });
+  } catch (err) {
+    console.error("Error fetching fare:", err.message);
+    res.status(500).json({ error: "Error fetching fare" });
+  }
+};
+
+export const getAllStops = async (req, res) => {
+  try {
+    const { data, error } = await supabase.from("stops").select("*"); // Fetch all fare
+
+    if (error) {
+      throw error;
+    }
+
+    res.json({ data });
+  } catch (err) {
+    console.error("Error fetching stops:", err.message);
+    res.status(500).json({ error: "Error fetching stops" });
+  }
+};
+
+// Get yatayat
+export const getYatayatId = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { data, error } = await supabase
+      .from("yatayat")
+      .select("*")
+      .eq("id", id) // Match by id
+      .single(); // Expect a single record
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "yatayat not found" });
+    }
+
+    res.json({ data });
+  } catch (err) {
+    console.error("Error fetching yatayat:", err.message);
+    res.status(500).json({ error: "Error fetching yatayat" });
   }
 };
 
