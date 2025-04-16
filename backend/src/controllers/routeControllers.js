@@ -97,7 +97,7 @@ export const getStopsForRoutes = async (req, res) => {
         // Fetch all stops for the selected route ordered by sequence
         const { data: allStops, error: stopsError } = await supabase
           .from("route_stops")
-          .select("stops_id, sequence, stops(stops_name, stops_lon, stops_lat)")
+          .select("stops_id, sequence, stops(stops_name, stops_lon, stops_lat, id)")
           .eq("route_id", selectedRouteId)
           .order("sequence", { ascending: true });
 
