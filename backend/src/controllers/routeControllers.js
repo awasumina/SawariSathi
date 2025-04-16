@@ -101,32 +101,37 @@ export const getStopsForRoutes = async (req, res) => {
 
     console.log(`Selected route ID: ${selectedRouteId}`);
 
-    // // Fetch the yatayat_id associated with the selected route
-    // const { data: routeYatayat, error: routeYatayatError } = await supabase
-    //   .from('route_yatayat')
-    //   .select('yatayat_id')
-    //   .eq('route_id', selectedRouteId)
-    //   // .single(); // Assuming a one-to-one relationship between route and yatayat
-    // console.log(routeYatayat);
-    // if (routeYatayatError) {
-    //   console.error('Error fetching route_yatayat:', routeYatayatError.message);
-    //   throw routeYatayatError;
-    // }
+    // Fetch the yatayat_id associated with the selected route
+    const { data: routeYatayat, error: routeYatayatError } = await supabase
+      .from("route_yatayat")
+      .select("yatayat_id")
+      .eq("route_id", selectedRouteId);
+    // .single(); // Assuming a one-to-one relationship between route and yatayat
+    console.log("selected", selectedRouteId);
+    console.log(" route yatayat", routeYatayat);
+    if (routeYatayatError) {
+      console.error("Error fetching route_yatayat:", routeYatayatError.message);
+      throw routeYatayatError;
+    }
 
-    // if (!routeYatayat) {
-    //   console.log('No yatayat found for the selected route.');
-    //   return res.status(404).json({ error: 'No yatayat associated with the selected route.' });
-    // }
+    if (!routeYatayat) {
+      console.log("No yatayat found for the selected route.");
+      return res
+        .status(404)
+        .json({ error: "No yatayat associated with the selected route." });
+    }
 
-    // const yatayatId = routeYatayat.id;
-    // console.log(yatayatId);
-    const yatayatId = 3;
+    // const yatayatId = routeYatayat.yatayat_id;
+    const yatayatIds = routeYatayat.map((item) => item.yatayat_id);
+    console.log("All Yatayat IDs:", yatayatIds);
+
+    console.log("yatayatIDs", yatayatIds);
 
     // Fetch the vehicle image file path from yatayat table
     const { data: yatayatData, error: yatayatError } = await supabase
       .from("yatayat")
       .select("yatayat_vehicle_image")
-      .eq("id", yatayatId)
+      .eq("id", yatayatIds)
       .single(); // Expecting a single result for this query
 
     console.log(yatayatData);
@@ -222,6 +227,7 @@ export const getStopsForRoutes = async (req, res) => {
         stops: formattedStops,
         fare,
         vehicleType,
+        yatayatIds,
         // vehicleImageUrl: imageUrlData.publicUrl,
       },
     });
