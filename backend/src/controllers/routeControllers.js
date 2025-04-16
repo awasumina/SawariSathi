@@ -44,6 +44,21 @@ export const getStopsForRoutes = async (req, res) => {
 
     console.log(`Selected route ID: ${selectedRouteId}`);
 
+    // Fetch the route_no from the route table using selectedRouteId
+const { data: routeData, error: routeDataError } = await supabase
+.from("route")
+.select("route_no")
+.eq("id", selectedRouteId)
+.single(); // Assuming route_id is unique in the route table
+
+if (routeDataError) {
+console.error("Error fetching route_no:", routeDataError.message);
+throw routeDataError;
+}
+const routeNo = routeData.route_no; // Extract the route_no from the response
+console.log("Route No for selected route:", routeData.route_no);
+
+
     // Fetch the yatayat_id associated with the selected route
     const { data: routeYatayat, error: routeYatayatError } = await supabase
       .from("route_yatayat")
@@ -134,30 +149,6 @@ export const getStopsForRoutes = async (req, res) => {
     // Format the stops
     const formattedStops = selectedStops.map(({ stops }) => stops);
 
-    // // Fetch fare data
-    // const { data: fare, error: fareError } = await supabase
-    //   .from("fare")
-    //   .select("*")
-    //   .in("stops_from_id", [stop1, stop2])
-    //   .in("stops_to_id", [stop2, stop1])
-    //   .single(); // Assuming only one fare exists per route
-
-    // if (fareError && fareError.code !== "PGRST116") {
-    //   // Ignore "no rows found" error
-    //   console.error("Error fetching fare:", fareError.message);
-    //   throw fareError;
-    // }
-
-    // // Return the stops and fare data along with the vehicle image URL
-    // res.json({
-    //   data: {
-    //     stops: formattedStops,
-    //     fare,
-    //     vehicleType,
-    //     yatayatIds,
-    //     // vehicleImageUrl: imageUrlData.publicUrl,
-    //   },
-    // });
     // Fetch fare for each yatayat (same fare for all since route is same)
     const yatayatDetails = await Promise.all(
       yatayatIds.map(async (id) => {
@@ -166,21 +157,22 @@ export const getStopsForRoutes = async (req, res) => {
           .select("*")
           .in("stops_from_id", [stop1, stop2])
           .in("stops_to_id", [stop2, stop1])
-          .single(); // still assuming one fare per direction
-
+          .single();
+    
         if (fareError && fareError.code !== "PGRST116") {
           console.error(`Fare error for yatayat_id ${id}:`, fareError.message);
         }
-
+    
         return {
           yatayat_id: id,
           vehicleType: yatayatMap[id],
           fare: fareData || null,
           stops: formattedStops,
+          route_no: routeNo, 
         };
       })
     );
-
+    
     // Final response
     res.json({
       data: yatayatDetails,
