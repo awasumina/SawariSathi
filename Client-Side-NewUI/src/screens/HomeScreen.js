@@ -33,14 +33,14 @@ const HomeScreen = ({ navigation }) => {
       icon: 'clock-outline', 
       color: colors.accent,
       backgroundColor: '#EBF5FF',
-      onPress: () => navigation.navigate('SearchTab') 
+      onPress: () => navigation.navigate('RecentSearchesScreen') 
     },
     { 
       name: 'Favorites', 
       icon: 'heart-outline', 
       color: colors.danger,
       backgroundColor: '#FFF0F3',
-      onPress: () => navigation.navigate('ProfileTab') 
+      onPress: () => navigation.navigate('FavoritesScreen') 
     },
     { 
       name: 'Notice', 

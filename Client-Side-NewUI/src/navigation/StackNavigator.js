@@ -7,11 +7,12 @@ import SearchScreen from '../screens/SearchScreen';
 import SearchResults from '../components/SearchResults';
 import VehicleDetails from '../components/VehicleDetails';
 import MapScreen from '../screens/MapScreen';
-// Fix the import path - ensure it matches where the file actually exists
 import NoticeScreen from '../screens/NoticeScreen';
 import NoticeDetailScreen from '../screens/NoticeDetailScreen';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../constants/theme';
+import RecentSearchesScreen from '../components/RecentSearchesScreen';
+import FavoritesScreen from '../components/FavoritesScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -105,12 +106,18 @@ const StackNavigator = () => {
         <Stack.Screen
           name="SearchResults"
           component={SearchResults}
-          options={{ title: 'Available Routes' }}
+          options={{ 
+            title: 'Available Routes',
+            headerShown: false,
+           }}
         />
         <Stack.Screen
           name="VehicleDetails"
           component={VehicleDetails}
-          options={{ title: 'Route Details' }}
+          options={{ 
+            title: 'Route Details',
+            headerShown: false,
+           }}
         />
         <Stack.Screen
           name="MapScreen"
@@ -121,6 +128,21 @@ const StackNavigator = () => {
           name="NoticeDetail"
           component={NoticeDetailScreen}
           options={{ title: 'Notice' }}
+        />
+        {/* Move these inside the Stack.Navigator */}
+        <Stack.Screen
+          name="RecentSearchesScreen"
+          component={RecentSearchesScreen}
+          options={{ 
+            headerShown: false // Use the custom header inside RecentSearchesScreen.js
+          }}
+        />
+        <Stack.Screen
+          name="FavoritesScreen"
+          component={FavoritesScreen}
+          options={{ 
+            headerShown: false // Use the custom header inside FavoritesScreen.js
+          }}
         />
       </Stack.Navigator>
     </NavigationContainer>

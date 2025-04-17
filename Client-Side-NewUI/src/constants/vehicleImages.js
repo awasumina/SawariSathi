@@ -1,14 +1,13 @@
+// src/constants/vehicleImages.js
 // Vehicle images for a transportation app
 // This module exports an object containing paths to various vehicle images.
-export const vehicleImages ={
 
-    car: require('../assets/images/car.png'),
-    bike: require('../assets/images/bike.png'),
-    bus: require('../assets/images/bus.png'),
-    truck: require('../assets/images/truck.png'),
-    van: require('../assets/images/van.png'),
-    scooter: require('../assets/images/scooter.png'),
-    bicycle: require('../assets/images/bicycle.png'),
-    autoRickshaw: require('../assets/images/auto-rickshaw.png'),
-    pickupTruck: require('../assets/images/pickup-truck.png'),
-}
+// Make sure these paths are correct relative to this file's location
+export const vehicleImages = {
+    microbus: require('../../assets/microbus.jpg'),
+    sajha: require('../../assets/sajha.jpg'),
+    bus: require('../../assets/localbus.jpg'),
+    tempo: require('../../assets/tempo.jpg'),
+    // Add a default image if needed
+    default: require('../../assets/localbus.jpg') // Example: use bus as default
+};

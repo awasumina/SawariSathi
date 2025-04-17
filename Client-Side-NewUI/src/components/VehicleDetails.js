@@ -1,4 +1,5 @@
-import React from 'react';
+// src/components/VehicleDetails.js
+import React , { useState, useEffect, useCallback }from 'react';
 import {
   View,
   Text,
@@ -8,56 +9,128 @@ import {
   TouchableOpacity,
   Platform,
   StatusBar,
-  ImageBackground,
+  Image, // Import Image
+  Dimensions,
+  ActivityIndicator, // To get screen width
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, fontSizes, borderRadius } from '../constants/theme';
+import { vehicleImages } from '../constants/vehicleImages'; // Import vehicle images
+import { storeData, getData } from '../utils/storage';
+
+const screenWidth = Dimensions.get('window').width;
+const FAVORITES_KEY = '@favorites'; // Key for storing favorites
 
 const VehicleDetails = ({ route, navigation }) => {
-  const { transport, fromLocation, toLocation } = route.params;
-  
-  const safeTransport = {
-    ...transport,
+  // Destructure props safely
+  const { transport, fromLocation = 'Origin', toLocation = 'Destination' } = route.params || {};
+
+   // --- ** State for Favorite Status ** ---
+   const [isFavorite, setIsFavorite] = useState(false);
+   const [isLoadingFavorite, setIsLoadingFavorite] = useState(true); // Loading state
+
+  // Create a safe transport object with defaults, crucial: include vehicleType
+   // ensure it has a stable ID
+   const safeTransport = React.useMemo(() => ({
+    id: transport?.id || `vehicle-${Math.random()}`, // Crucial: MUST have a stable ID
     vehicle: {
-      type: transport.vehicle?.type || 'Bus',
-      name: transport.vehicle?.name || 'Unknown Service',
-      count: transport.vehicle?.count || 'N/A',
+        type: transport?.vehicle?.type || transport?.vehicleType || 'Bus',
+        name: transport?.vehicle?.name || transport?.routeName || 'Unknown Service',
+        count: transport?.vehicle?.count || 'N/A',
     },
-    stops: transport.stops?.map(stop => ({
-      name: stop.stops_name || 'Unknown Stop',
-      lat: parseFloat(stop.stops_lat) || 0,
-      lon: parseFloat(stop.stops_lon) || 0
+    stops: transport?.stops?.map(stop => ({
+        name: stop.stops_name || 'Unknown Stop',
+        lat: parseFloat(stop.stops_lat) || 0,
+        lon: parseFloat(stop.stops_lon) || 0
     })) || [],
-    fare: transport.fare || 0,
-    discountedFare: transport.discountedFare || null,
-    distance: transport.distance || 'N/A',
-    routeNumber: transport.id || 'N/A',
-    timing: transport.estimatedTime || '6:00am - 8:00pm'
+    fare: transport?.fare ?? 0,
+    discountedFare: transport?.discountedFare ?? null,
+    distance: transport?.distance || 'N/A',
+    routeNumber: transport?.routeNo || 'N/A',
+    timing: transport?.estimatedTime || 'N/A',
+    vehicleType: transport?.vehicleType || 'bus',
+    // Include from/to in the saved object for context in FavoritesScreen
+    fromLocation: fromLocation,
+    toLocation: toLocation,
+}), [transport, fromLocation, toLocation]);
+
+ // --- ** Check Favorite Status on Load ** ---
+ useEffect(() => {
+  const checkFavoriteStatus = async () => {
+    if (!safeTransport.id) { // Don't proceed if no ID
+      setIsLoadingFavorite(false);
+      return;
+    }
+    setIsLoadingFavorite(true);
+    const favorites = await getData(FAVORITES_KEY);
+    if (favorites && Array.isArray(favorites)) {
+      const found = favorites.some(fav => fav.id === safeTransport.id);
+      setIsFavorite(found);
+    } else {
+      setIsFavorite(false);
+    }
+    setIsLoadingFavorite(false);
   };
 
+  checkFavoriteStatus();
+}, [safeTransport.id]); // Re-check if the ID changes (shouldn't often)
+
+// --- ** Toggle Favorite Handler ** ---
+const handleToggleFavorite = useCallback(async () => {
+  if (!safeTransport.id) {
+      alert("Cannot save favorite: Missing unique identifier.");
+      return;
+  }
+  setIsLoadingFavorite(true); // Show indicator during save
+  const currentFavorites = await getData(FAVORITES_KEY) || [];
+  let updatedFavorites;
+
+  if (isFavorite) {
+    // Remove from favorites
+    updatedFavorites = currentFavorites.filter(fav => fav.id !== safeTransport.id);
+  } else {
+    // Add to favorites (prevent duplicates just in case)
+     if (!currentFavorites.some(fav => fav.id === safeTransport.id)) {
+         updatedFavorites = [...currentFavorites, safeTransport];
+     } else {
+         updatedFavorites = currentFavorites; // Already exists, no change needed
+     }
+  }
+
+  await storeData(FAVORITES_KEY, updatedFavorites);
+  setIsFavorite(!isFavorite); // Update local state
+  setIsLoadingFavorite(false);
+}, [isFavorite, safeTransport]);
+
+  // Handle navigation to MapScreen
   const handleViewMap = () => {
+    if (!safeTransport.stops || safeTransport.stops.length === 0) {
+        alert("No stop information available to display on the map.");
+        return;
+    }
     navigation.navigate('MapScreen', {
-      stops: safeTransport.stops,
+      stops: safeTransport.stops, // Pass the processed stops
       fromLocation,
       toLocation,
-      routeInfo: {
+      routeInfo: { // Pass relevant info for the map header
         name: safeTransport.vehicle.name,
-        type: safeTransport.vehicle.type,
-        number: safeTransport.routeNumber
+        type: safeTransport.vehicleType, // Pass the specific type
+        number: safeTransport.routeNumber,
       }
     });
   };
 
-  const RouteStop = ({ stop, isFirst, isLast, index }) => (
+  // Component to render each stop in the list
+  const RouteStop = ({ stop, isFirst, isLast }) => (
     <View style={styles.stopContainer}>
       <View style={styles.stopIndicator}>
         {isFirst ? (
           <View style={[styles.dot, styles.startDot]}>
-            <MaterialCommunityIcons name="circle-slice-8" size={16} color={colors.background} />
+            <MaterialCommunityIcons name="flag-variant" size={16} color={colors.background} />
           </View>
         ) : isLast ? (
           <View style={[styles.dot, styles.endDot]}>
-            <MaterialCommunityIcons name="map-marker" size={16} color={colors.background} />
+            <MaterialCommunityIcons name="flag-checkered" size={16} color={colors.background} />
           </View>
         ) : (
           <View style={styles.dot} />
@@ -67,161 +140,155 @@ const VehicleDetails = ({ route, navigation }) => {
       <View style={styles.stopDetails}>
         <Text style={[
           styles.stopText,
-          isFirst && styles.startStopText,
-          isLast && styles.endStopText
+          (isFirst || isLast) && styles.terminalStopText // Style for first/last stops
         ]}>
           {stop.name}
         </Text>
-        {(isFirst || isLast) && (
+        {/* Optional: Label for start/end */}
+        {/* {(isFirst || isLast) && (
           <Text style={styles.stopLabel}>
-            {isFirst ? 'Starting Point' : 'Destination'}
+            {isFirst ? 'Start' : 'End'}
           </Text>
-        )}
+        )} */}
       </View>
     </View>
   );
 
+  // Determine the image source based on vehicleType
+  const imageSource = vehicleImages[safeTransport.vehicleType?.toLowerCase()] || vehicleImages.bus; // Default to bus
+
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      
-      {/* Header with Gradient Background */}
-      <ImageBackground
-        source={require('../../assets/transport-hero.jpg')}
-        style={styles.headerBg}
-      >
-        <View style={styles.headerOverlay}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.background} />
+      <StatusBar barStyle="dark-content" />
+      {/* Custom Header */}
+      <View style={styles.header}>
+          <TouchableOpacity style={styles.headerButton} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color={colors.primaryText} />
           </TouchableOpacity>
-          
-          <View style={styles.headerContent}>
-            <View style={styles.vehicleIconContainer}>
-              <MaterialCommunityIcons 
-                name={safeTransport.vehicle.type.toLowerCase() === 'bus' ? 'bus' : 'car'} 
-                size={28} 
-                color={colors.background} 
-              />
-            </View>
-            
-            <View style={styles.headerInfo}>
-              <Text style={styles.routeName}>{safeTransport.vehicle.name}</Text>
-              <Text style={styles.vehicleType}>
-                {safeTransport.vehicle.type.toUpperCase()} SERVICE
-              </Text>
-              <View style={styles.routePathContainer}>
-                <Text style={styles.routePath}>
-                  {fromLocation} → {toLocation}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      </ImageBackground>
+          <Text style={styles.headerTitle} numberOfLines={1}>{safeTransport.vehicleType?.toUpperCase()} Details</Text>
+          {/* Favorite Toggle Button */}
+          <TouchableOpacity style={styles.headerButton} onPress={handleToggleFavorite} disabled={isLoadingFavorite}>
+              {isLoadingFavorite ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                  <Ionicons
+                      name={isFavorite ? 'heart' : 'heart-outline'}
+                      size={26} // Slightly larger
+                      color={isFavorite ? colors.danger : colors.primaryText} // Red when favorite
+                  />
+              )}
+          </TouchableOpacity>
+      </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.contentContainer}>
+
+         {/* Vehicle Image Display */}
+         <View style={styles.imageContainer}>
+             <Image
+                 source={imageSource}
+                 style={styles.vehicleImage}
+                 resizeMode="cover" // Or 'contain' depending on image aspect ratios
+             />
+         </View>
+
         {/* Route Summary Card */}
-        <View style={styles.summaryCard}>
-          <View style={styles.summaryHeader}>
-            <Text style={styles.summaryTitle}>Route Summary</Text>
-            <View style={styles.routeNumberContainer}>
-              <Text style={styles.routeNumber}>Route #{safeTransport.routeNumber}</Text>
-            </View>
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <MaterialCommunityIcons name="information-outline" size={22} color={colors.primary} />
+            <Text style={styles.cardTitle}>Route Summary</Text>
           </View>
 
           <View style={styles.statsContainer}>
+            {/* Fare */}
             <View style={styles.statItem}>
-              <View style={styles.statIconContainer}>
-                <MaterialCommunityIcons name="cash" size={20} color={colors.primary} />
+              <MaterialCommunityIcons name="cash-multiple" size={20} color={colors.primary} style={styles.statIcon}/>
+              <View>
+                  <Text style={styles.statValue}>
+                    Rs. {safeTransport.fare}
+                    {safeTransport.discountedFare && safeTransport.discountedFare !== safeTransport.fare && (
+                      <Text style={styles.discountText}> (Rs. {safeTransport.discountedFare})</Text>
+                    )}
+                  </Text>
+                  <Text style={styles.statLabel}>Fare</Text>
               </View>
-              <Text style={styles.statValue}>
-                Rs. {safeTransport.fare}
-                {safeTransport.discountedFare && (
-                  <Text style={styles.discountText}> (Rs. {safeTransport.discountedFare})</Text>
-                )}
-              </Text>
-              <Text style={styles.statLabel}>Fare</Text>
             </View>
-
-            <View style={styles.statDivider} />
-
+            {/* Distance */}
             <View style={styles.statItem}>
-              <View style={styles.statIconContainer}>
-                <MaterialCommunityIcons name="map-marker-distance" size={20} color={colors.primary} />
+             <MaterialCommunityIcons name="map-marker-distance" size={20} color={colors.primary} style={styles.statIcon}/>
+              <View>
+                 <Text style={styles.statValue}>{safeTransport.distance} km</Text>
+                 <Text style={styles.statLabel}>Est. Distance</Text>
               </View>
-              <Text style={styles.statValue}>{safeTransport.distance} km</Text>
-              <Text style={styles.statLabel}>Distance</Text>
             </View>
-
-            <View style={styles.statDivider} />
-
+            {/* Timing */}
             <View style={styles.statItem}>
-              <View style={styles.statIconContainer}>
-                <MaterialCommunityIcons name="clock-outline" size={20} color={colors.primary} />
+              <MaterialCommunityIcons name="clock-time-eight-outline" size={20} color={colors.primary} style={styles.statIcon}/>
+              <View>
+                <Text style={styles.statValue} numberOfLines={1}>{safeTransport.timing}</Text>
+                <Text style={styles.statLabel}>Operating Hours</Text>
               </View>
-              <Text style={styles.statValue} numberOfLines={1}>{safeTransport.timing}</Text>
-              <Text style={styles.statLabel}>Timing</Text>
             </View>
+             {/* Route Number */}
+            <View style={styles.statItem}>
+                <MaterialCommunityIcons name="sign-direction" size={20} color={colors.primary} style={styles.statIcon}/>
+                <View>
+                   <Text style={styles.statValue}>#{safeTransport.routeNumber}</Text>
+                   <Text style={styles.statLabel}>Route No.</Text>
+                </View>
+            </View>
+          </View>
+
+          <View style={styles.routePathDisplay}>
+             <MaterialCommunityIcons name="map-marker-path" size={18} color={colors.primary} />
+             <Text style={styles.routePathText} numberOfLines={2}>
+                 {fromLocation} <Text style={{fontWeight: 'bold'}}>→</Text> {toLocation}
+             </Text>
           </View>
         </View>
 
-        {/* Service Info Card */}
-        <View style={styles.infoCard}>
-          <View style={styles.infoHeader}>
-            <MaterialCommunityIcons name="information-outline" size={20} color={colors.primary} />
-            <Text style={styles.infoTitle}>Service Information</Text>
-          </View>
-          <View style={styles.infoContent}>
-            <Text style={styles.infoText}>
-              This route is operated by {safeTransport.vehicle.count} vehicles throughout the day. 
-              Peak hours may experience higher passenger volume.
-            </Text>
-            <View style={styles.operatorBadge}>
-              <Text style={styles.operatorText}>Official City Service</Text>
+        {/* Route Stops Section */}
+        {safeTransport.stops && safeTransport.stops.length > 0 && (
+            <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                    <MaterialCommunityIcons name="format-list-numbered" size={22} color={colors.primary} />
+                    <Text style={styles.cardTitle}>Route Stops</Text>
+                </View>
+                <View style={styles.stopsList}>
+                  {safeTransport.stops.map((stop, index) => (
+                    <RouteStop
+                      key={`${stop.lat}-${stop.lon}-${index}`} // More robust key
+                      stop={stop}
+                      index={index}
+                      isFirst={index === 0}
+                      isLast={index === safeTransport.stops.length - 1}
+                    />
+                  ))}
+                </View>
             </View>
-          </View>
-        </View>
-
-        {/* Route Details */}
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>Route Stops</Text>
-          <View style={styles.stopsList}>
-            {safeTransport.stops.map((stop, index) => (
-              <RouteStop 
-                key={`${stop.name}-${index}`}
-                stop={stop}
-                index={index}
-                isFirst={index === 0}
-                isLast={index === safeTransport.stops.length - 1}
-              />
-            ))}
-          </View>
-        </View>
+        )}
 
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
-          <TouchableOpacity 
-            style={styles.mapButton}
+          <TouchableOpacity
+            style={[styles.actionButton, styles.mapButton]}
             onPress={handleViewMap}
+            disabled={!safeTransport.stops || safeTransport.stops.length === 0} // Disable if no stops
           >
             <MaterialCommunityIcons name="map-outline" size={20} color={colors.background} />
-            <Text style={styles.buttonText}>View on Map</Text>
+            <Text style={styles.actionButtonText}>View on Map</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.favoriteButton}>
+
+          {/* <TouchableOpacity style={[styles.actionButton, styles.favoriteButton]}>
             <MaterialCommunityIcons name="heart-outline" size={20} color={colors.primary} />
-            <Text style={styles.favoriteText}>Save Route</Text>
-          </TouchableOpacity>
+            <Text style={[styles.actionButtonText, styles.favoriteText]}>Save Route</Text>
+          </TouchableOpacity> */}
         </View>
 
         {/* Disclaimer */}
         <View style={styles.disclaimerContainer}>
           <MaterialCommunityIcons name="information-outline" size={16} color={colors.secondaryText} />
           <Text style={styles.disclaimer}>
-            Fares and schedules are subject to change without prior notice
+            Information may vary. Fares and schedules are subject to change.
           </Text>
         </View>
       </ScrollView>
@@ -229,320 +296,261 @@ const VehicleDetails = ({ route, navigation }) => {
   );
 };
 
+// --- Styles ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
-  headerBg: {
-    height: 180,
-    width: '100%',
-  },
-  headerOverlay: {
-    height: '100%',
-    width: '100%',
-    backgroundColor: `${colors.primary}E6`, // Slightly transparent
-    padding: spacing.lg,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.circle,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  headerContent: {
+  // Custom Header
+  header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    justifyContent: 'space-between', // Space items evenly
+    paddingHorizontal: spacing.sm, // Reduced padding
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.cardBackground,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  vehicleIconContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    width: 50,
-    height: 50,
-    borderRadius: borderRadius.circle,
+  headerButton: {
+    padding: spacing.sm,
+    minWidth: 44, // Ensure tap area
+    minHeight: 44, // Ensure tap area
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
   },
-  headerInfo: {
+  headerTitle: {
     flex: 1,
-  },
-  routeName: {
-    fontSize: fontSizes.xl,
-    fontWeight: 'bold',
-    color: colors.background,
-  },
-  vehicleType: {
-    color: colors.background,
-    fontSize: fontSizes.sm,
-    opacity: 0.8,
-    marginBottom: spacing.sm,
-  },
-  routePathContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    alignSelf: 'flex-start',
-    marginTop: spacing.xs,
-  },
-  routePath: {
-    color: colors.background,
-    fontSize: fontSizes.md,
+    textAlign: 'center',
+    fontSize: fontSizes.lg,
+    fontWeight: '600',
+    color: colors.primaryText,
+    marginHorizontal: spacing.xs, // Give title some breathing room
   },
   contentContainer: {
     paddingBottom: spacing.xl,
   },
-  summaryCard: {
-    margin: spacing.md,
+  // Image Styles
+  imageContainer: {
+      marginHorizontal: spacing.md,
+      marginTop: spacing.md,
+      marginBottom: spacing.sm, // Space below image
+      borderRadius: borderRadius.lg,
+      overflow: 'hidden', // Clip image to rounded corners
+      backgroundColor: colors.highlight, // Placeholder background
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.15,
+      shadowRadius: 5,
+      elevation: 4,
+  },
+  vehicleImage: {
+    width: '100%',
+    height: screenWidth * 0.5, // Adjust aspect ratio as needed (e.g., 50% of screen width)
+    borderRadius: borderRadius.lg, // Match container rounding
+  },
+  // Card Styles
+  card: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.lg, // Space between cards
     backgroundColor: colors.cardBackground,
     borderRadius: borderRadius.lg,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
     overflow: 'hidden',
   },
-  summaryHeader: {
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     padding: spacing.md,
-    backgroundColor: colors.highlight,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.highlight, // Subtle header background
   },
-  summaryTitle: {
+  cardTitle: {
     fontSize: fontSizes.md,
     fontWeight: '600',
     color: colors.primaryText,
+    marginLeft: spacing.sm,
   },
-  routeNumberContainer: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-  },
-  routeNumber: {
-    color: colors.background,
-    fontSize: fontSizes.sm,
-    fontWeight: '500',
-  },
+  // Stats Styles
   statsContainer: {
     flexDirection: 'row',
-    padding: spacing.md,
+    flexWrap: 'wrap', // Allow items to wrap on smaller screens
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
   statItem: {
-    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
+    width: '50%', // Two items per row
+    paddingVertical: spacing.sm, // Vertical padding for each item
+    // marginBottom: spacing.sm,
   },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: borderRadius.circle,
-    backgroundColor: `${colors.primary}15`,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
+   statIcon: {
+      marginRight: spacing.sm,
   },
   statValue: {
-    fontSize: fontSizes.md,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.primaryText,
-    marginBottom: spacing.xs,
+    marginBottom: spacing.xxs,
   },
   statLabel: {
     color: colors.secondaryText,
     fontSize: fontSizes.sm,
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.sm,
-  },
   discountText: {
     color: colors.secondaryText,
     fontSize: fontSizes.sm,
-    textDecorationLine: 'line-through',
   },
-  infoCard: {
-    margin: spacing.md,
-    marginTop: 0,
-    backgroundColor: colors.cardBackground,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  routePathDisplay: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: `${colors.primary}10`, // Light primary background
   },
-  infoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
+  routePathText: {
+      marginLeft: spacing.sm,
+      fontSize: fontSizes.md,
+      color: colors.primaryText,
+      fontWeight: '500',
+      flexShrink: 1, // Allow text to shrink
   },
-  infoTitle: {
-    fontSize: fontSizes.md,
-    fontWeight: '600',
-    color: colors.primaryText,
-    marginLeft: spacing.sm,
-  },
-  infoContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  infoText: {
-    flex: 1,
-    color: colors.secondaryText,
-    fontSize: fontSizes.sm,
-    lineHeight: 20,
-  },
-  operatorBadge: {
-    backgroundColor: `${colors.success}20`,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    marginLeft: spacing.sm,
-  },
-  operatorText: {
-    color: colors.success,
-    fontSize: fontSizes.sm,
-    fontWeight: '500',
-  },
-  sectionContainer: {
-    margin: spacing.md,
-    marginTop: 0,
-  },
-  sectionTitle: {
-    fontSize: fontSizes.lg,
-    fontWeight: '600',
-    color: colors.primaryText,
-    marginBottom: spacing.md,
-  },
+  // Stops List Styles
   stopsList: {
-    backgroundColor: colors.cardBackground,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm, // Add vertical padding
   },
   stopContainer: {
     flexDirection: 'row',
-    marginBottom: spacing.md,
+    alignItems: 'flex-start', // Align items to the top for multiline text
+    paddingVertical: spacing.sm, // Add vertical padding to each stop item
   },
   stopIndicator: {
     alignItems: 'center',
-    width: 20,
+    width: 24, // Increased width for bigger dots
     marginRight: spacing.md,
+    marginTop: 2, // Align indicator slightly lower
   },
   dot: {
-    width: 12,
-    height: 12,
+    width: 10,
+    height: 10,
     borderRadius: borderRadius.circle,
     backgroundColor: colors.secondaryText,
     zIndex: 1,
   },
   startDot: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: borderRadius.circle,
   },
   endDot: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: borderRadius.circle,
   },
   line: {
     width: 2,
-    height: 40,
+    flex: 1, // Make line fill the space between dots
     backgroundColor: colors.border,
     position: 'absolute',
-    top: 12,
+    top: 20, // Start below the start/end dot
+    bottom: 0,
+    left: '50%', // Center the line
+    transform: [{ translateX: -1 }], // Adjust position based on line width
     zIndex: 0,
+    // Need to calculate dynamic height if items vary greatly, or set a fixed large height
+    height: 40, // Adjust based on typical item height
   },
   stopDetails: {
-    flex: 1,
+    flex: 1, // Allow text to take space
   },
   stopText: {
     fontSize: fontSizes.md,
     color: colors.primaryText,
+    lineHeight: fontSizes.md * 1.4, // Improve readability
   },
-  startStopText: {
+  terminalStopText: { // Style for first and last stops
     fontWeight: '600',
     color: colors.primary,
   },
-  endStopText: {
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  stopLabel: {
-    fontSize: fontSizes.sm,
-    color: colors.secondaryText,
-    marginTop: spacing.xs,
-  },
+  stopLabel: { /* Optional Label */ },
+  // Actions Styles
   actionsContainer: {
+    padding: spacing.md,
+    // flexDirection: 'row', // Keep as column for single button now
+    // justifyContent: 'space-between',
+  },
+  actionButton: {
     flexDirection: 'row',
-    margin: spacing.md,
-    marginTop: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.lg,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   mapButton: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: colors.primary,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    marginRight: spacing.md,
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    // flex: 1, // Make it full width if it's the only button
   },
-  buttonText: {
-    color: colors.background,
+  actionButtonText: {
     fontSize: fontSizes.md,
-    fontWeight: '500',
+    fontWeight: '600',
     marginLeft: spacing.sm,
   },
-  favoriteButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: `${colors.primary}15`,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
+  mapButton: {
+      backgroundColor: colors.primary,
+      shadowColor: colors.primary,
+      // If only one button, make it full width:
+      // flex: 1,
   },
-  favoriteText: {
-    color: colors.primary,
-    fontSize: fontSizes.md,
-    fontWeight: '500',
-    marginLeft: spacing.sm,
+  actionButtonText: {
+      color: colors.background, // Text color for primary button
+      fontSize: fontSizes.md,
+      fontWeight: '600',
+      marginLeft: spacing.sm,
   },
+  favoriteButton: { /* Styles if favorite button is added back */ },
+  favoriteText: { /* Styles if favorite button is added back */ },
+  // Disclaimer Styles
   disclaimerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    margin: spacing.lg,
-    marginTop: spacing.xl,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md, // Space above disclaimer
+    marginBottom: spacing.lg, // Space below disclaimer
+    padding: spacing.sm,
+    backgroundColor: colors.highlight,
+    borderRadius: borderRadius.md,
   },
   disclaimer: {
     color: colors.secondaryText,
     fontSize: fontSizes.sm,
     marginLeft: spacing.xs,
+    textAlign: 'center',
+    flexShrink: 1, // Allow text to wrap
   },
 });
+
 
 export default VehicleDetails;
