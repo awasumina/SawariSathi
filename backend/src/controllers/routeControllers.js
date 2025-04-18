@@ -85,7 +85,7 @@ export const getStopsForRoutes = async (req, res) => {
         // Fetch the vehicle image file path from yatayat table
         const { data: yatayatData, error: yatayatError } = await supabase
           .from("yatayat")
-          .select("id, yatayat_vehicle_image, vehicle_timing")
+          .select("id, yatayat_vehicle_image, vehicle_timing,yatayat_name")
           .in("id", yatayatIds);
 
         console.log("yatayatData", yatayatData);
@@ -109,6 +109,11 @@ export const getStopsForRoutes = async (req, res) => {
         }, {});
 
         console.log("yatayatTime", yatayatTime);
+
+        const yatayatName = yatayatData.reduce((acc, curr) => {
+          acc[curr.id] = curr.yatayat_name;
+          return acc;
+        }, {});
 
         // Fetch all stops for the selected route ordered by sequence
         const { data: allStops, error: stopsError } = await supabase
@@ -160,6 +165,7 @@ export const getStopsForRoutes = async (req, res) => {
               yatayat_id: id,
               vehicle_timing: yatayatTime[id],
               vehicleType: yatayatMap[id],
+              yatayatName: yatayatName[id],
               fare: fareData || null,
               stops: formattedStops,
               route_no: routeData.route_no,
