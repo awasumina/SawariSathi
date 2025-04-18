@@ -21,7 +21,7 @@ import axios from 'axios';
 // import { transformRouteData } from '../screens/SearchScreen';
 
 const FAVORITES_KEY = '@favorites';
-const API_BASE_URL = 'http://192.168.101.2:3000/api'; // Ensure this is correct
+const API_BASE_URL = 'http://192.168.1.69:3000/api'; // Ensure this is correct
 
 const getVehicleIconName = (type) => {
     switch (type?.toLowerCase()) {

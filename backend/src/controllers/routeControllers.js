@@ -64,6 +64,8 @@ export const getStopsForRoutes = async (req, res) => {
           .select("yatayat_id")
           .eq("route_id", selectedRouteId);
 
+        console.log("routeYatayat", routeYatayat);
+
         if (routeYatayatError) {
           console.error(
             "Error fetching route_yatayat:",
@@ -77,12 +79,19 @@ export const getStopsForRoutes = async (req, res) => {
         }
 
         const yatayatIds = routeYatayat.map((item) => item.yatayat_id);
+        // const yatayatTiming = routeYatayat.map((item) => item.vehicle_timing);
+        // console.log("yatayat timing", yatayatTiming);
 
         // Fetch the vehicle image file path from yatayat table
         const { data: yatayatData, error: yatayatError } = await supabase
           .from("yatayat")
-          .select("id, yatayat_vehicle_image")
+          .select("id, yatayat_vehicle_image, vehicle_timing")
           .in("id", yatayatIds);
+
+        console.log("yatayatData", yatayatData);
+
+        const yatayatTiming = yatayatData.map((item) => item.vehicle_timing);
+        console.log("yatayat timing", yatayatTiming);
 
         if (yatayatError) {
           console.error("Error fetching yatayat data:", yatayatError.message);
@@ -94,10 +103,19 @@ export const getStopsForRoutes = async (req, res) => {
           return acc;
         }, {});
 
+        const yatayatTime = yatayatData.reduce((acc, curr) => {
+          acc[curr.id] = curr.vehicle_timing;
+          return acc;
+        }, {});
+
+        console.log("yatayatTime", yatayatTime);
+
         // Fetch all stops for the selected route ordered by sequence
         const { data: allStops, error: stopsError } = await supabase
           .from("route_stops")
-          .select("stops_id, sequence, stops(stops_name, stops_lon, stops_lat, id)")
+          .select(
+            "stops_id, sequence, stops(stops_name, stops_lon, stops_lat, id)"
+          )
           .eq("route_id", selectedRouteId)
           .order("sequence", { ascending: true });
 
@@ -140,6 +158,7 @@ export const getStopsForRoutes = async (req, res) => {
 
             return {
               yatayat_id: id,
+              vehicle_timing: yatayatTime[id],
               vehicleType: yatayatMap[id],
               fare: fareData || null,
               stops: formattedStops,
@@ -170,7 +189,6 @@ export const getStopsForRoutes = async (req, res) => {
       .json({ error: "Internal server error", message: err.message });
   }
 };
-
 
 // Get all fare
 export const getFare = async (req, res) => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,12 +12,13 @@ import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, fontSizes } from '../constants/theme';
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyASVkSggJPw-RO7Z9TomO6u06aWoP3dAro';
+const GOOGLE_MAPS_API_KEY = '';
 
 export default function MapScreen({ route, navigation }) {
   const [routeCoords, setRouteCoords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const fetchedRef = useRef(false);
   
   // Default values in case route.params is undefined
   const stops = route.params?.stops || [];
@@ -32,8 +33,8 @@ export default function MapScreen({ route, navigation }) {
   }));
 
   useEffect(() => {
-    if (convertedStops.length < 2) {
-      // If there are not enough stops, don't try to get route
+    // Prevent multiple fetches for the same route
+    if (convertedStops.length < 2 || fetchedRef.current) {
       return;
     }
 
@@ -44,11 +45,7 @@ export default function MapScreen({ route, navigation }) {
       try {
         const origin = convertedStops[0];
         const destination = convertedStops[convertedStops.length - 1];
-        const waypoints = convertedStops
-          .slice(1, -1)
-          .map((p) => `${p.latitude},${p.longitude}`)
-          .join('|');
-
+        const waypoints = convertedStops.slice(1, -1).map((p) => `${p.latitude},${p.longitude}`).join('|');
         const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&waypoints=${waypoints}&key=${GOOGLE_MAPS_API_KEY}`;
 
         const res = await fetch(url);
@@ -57,6 +54,7 @@ export default function MapScreen({ route, navigation }) {
         if (json.routes && json.routes.length > 0) {
           const points = decodePolyline(json.routes[0].overview_polyline.points);
           setRouteCoords(points);
+          fetchedRef.current = true; // Mark that we've fetched for this route
         } else {
           console.error('No routes found:', json);
           setError('No route found');
@@ -70,7 +68,14 @@ export default function MapScreen({ route, navigation }) {
     };
 
     getRoute();
-  }, [convertedStops]);
+  }, [JSON.stringify(convertedStops)]); // Use JSON.stringify to properly compare the array
+
+  // Reset the fetch ref when route params change
+  useEffect(() => {
+    return () => {
+      fetchedRef.current = false;
+    };
+  }, [route.params]);
 
   const decodePolyline = (encoded) => {
     let points = [];

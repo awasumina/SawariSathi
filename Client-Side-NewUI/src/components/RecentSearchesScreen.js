@@ -20,7 +20,7 @@ import axios from 'axios';
 import { transformRouteData } from '../screens/SearchScreen'; // Import the transform function
 
 const RECENT_SEARCHES_KEY = '@recent_searches';
-const API_BASE_URL = 'http://192.168.101.2:3000/api'; // Make sure this matches your API URL
+const API_BASE_URL = 'http://192.168.1.69:3000/api'; // Make sure this matches your API URL
 
 const RecentSearchesScreen = ({ navigation }) => {
   const [recentSearches, setRecentSearches] = useState([]);
