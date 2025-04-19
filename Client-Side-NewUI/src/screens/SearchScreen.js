@@ -20,8 +20,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import { colors, spacing, fontSizes, borderRadius } from '../constants/theme';
 import { storeData, getData } from '../utils/storage'; // Import storage utils
-
-const API_BASE_URL = 'http://192.168.1.69:3000/api'; // Ensure correct IP
+import { API_BASE_URL } from '../config/api';
+// const API_BASE_URL = 'http://192.168.101.2:3000/api'; // Ensure correct IP
 const RECENT_SEARCHES_KEY = '@recent_searches';
 const MAX_RECENT_SEARCHES = 20;
 
@@ -50,7 +50,7 @@ export const transformRouteData = (apiDetailData, fromStopId, toStopId) => {
     };
 
     return {
-        id: apiDetailData.yatayat_id || `detail-${Math.random()}`, // Use yatayat_id as the unique ID
+        id: apiDetailData.yatayat_id || `detail-${Math.random()}`,
         vehicle: {
             type: apiDetailData.vehicleType || 'Bus',
             name: apiDetailData.route_name || `Route ${apiDetailData.route_no || ''}`,
@@ -60,11 +60,11 @@ export const transformRouteData = (apiDetailData, fromStopId, toStopId) => {
         discountedFare: apiDetailData.fare?.discounted_fare || 0,
         stops: apiDetailData.stops || [],
         distance: calculateDistance(apiDetailData.stops || []),
-        estimatedTime: '06:00 AM - 08:00 PM', // Placeholder
+        estimatedTime: apiDetailData.vehicle_timing || 'N/A',
         vehicleType: apiDetailData.vehicleType || 'bus',
         routeNo: apiDetailData.route_no || 'Unknown',
         routeName: apiDetailData.route_name || 'Unknown Route Name',
-        // Include stop IDs for favorite refetching
+        yatayatName: apiDetailData.yatayatName || 'Unknown Operator',
         fromStopId: fromStopId,
         toStopId: toStopId,
     };
@@ -138,31 +138,37 @@ const SearchScreen = ({ navigation, route }) => {
             alert('Please select valid departure and destination points.');
             return;
         }
-
+    
         setLoading(true);
         try {
             const fromStop = locations.find(stop => stop.name === fromLocation);
             const toStop = locations.find(stop => stop.name === toLocation);
-
+    
             if (!fromStop || !toStop) {
                 alert('One or both locations not found in our database.');
                 setLoading(false);
                 return;
             }
-
+    
             const response = await axios.get(
                 `${API_BASE_URL}/routes/stops?stop1=${fromStop.id}&stop2=${toStop.id}`
             );
-
-            if (response.data?.data?.[0]?.details?.length > 0) {
-                const routeData = response.data.data[0];
-                const details = routeData.details;
-
-                // Pass Stop IDs to transform function
-                const transformedResults = details.map(detail =>
-                    transformRouteData(detail, fromStop.id, toStop.id) // Pass IDs
-                );
-
+    
+            // Check if we have valid data structure
+            if (response.data?.data) {
+                // Flatten all routes and their details into a single array
+                const allTransportOptions = [];
+                
+                response.data.data.forEach(routeData => {
+                    if (routeData.details && Array.isArray(routeData.details)) {
+                        // Map each detail and add it to results
+                        const routeOptions = routeData.details.map(detail => 
+                            transformRouteData(detail, fromStop.id, toStop.id)
+                        );
+                        allTransportOptions.push(...routeOptions);
+                    }
+                });
+    
                 // Save Recent Search
                 const newSearch = { from: fromLocation, to: toLocation, timestamp: Date.now() };
                 const currentSearches = [...recentSearches];
@@ -170,15 +176,14 @@ const SearchScreen = ({ navigation, route }) => {
                 const updatedRecents = [newSearch, ...filteredSearches].slice(0, MAX_RECENT_SEARCHES);
                 setRecentSearches(updatedRecents);
                 await storeData(RECENT_SEARCHES_KEY, updatedRecents);
-
+    
                 navigation.navigate('SearchResults', {
-                    results: transformedResults,
+                    results: allTransportOptions,
                     fromLocation,
-                    toLocation,
-                    routeNo: routeData.route_no || 'Unknown'
+                    toLocation
                 });
             } else {
-                alert('No direct transport options found for this route.');
+                alert('No transport options found for this route.');
             }
         } catch (error) {
             console.error('Search error:', error);
@@ -461,7 +466,7 @@ const styles = StyleSheet.create({
         marginTop: spacing.sm,
     },
     searchButtonDisabled: {
-        backgroundColor: colors.disabled,
+        backgroundColor: '#EF9651',
         shadowOpacity: 0.1,
         elevation: 1,
     },
