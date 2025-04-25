@@ -1,3 +1,4 @@
+// src/components/SearchResults.js
 import React, { useCallback } from 'react';
 import {
   View,
@@ -23,6 +24,8 @@ const getVehicleIconName = (type) => {
     }
 };
 
+// Fixed TransportCard component
+// Updated version of the TransportCard component with improved multi-leg display
 const TransportCard = React.memo(({ item, navigation, fromLocation, toLocation }) => {
   const {
     vehicle = { type: 'Bus', name: 'Unknown Route' },
@@ -35,6 +38,11 @@ const TransportCard = React.memo(({ item, navigation, fromLocation, toLocation }
     routeName = 'Unknown Route',
     yatayatName = 'Unknown Operator',
     id,
+    isMultiLeg = false,
+    secondLeg = null,
+    transferStop = null,
+    combinedFare = 0,
+    combinedDistance = 0,
   } = item;
 
   const handleViewDetails = () => {
@@ -51,6 +59,14 @@ const TransportCard = React.memo(({ item, navigation, fromLocation, toLocation }
       onPress={handleViewDetails}
       activeOpacity={0.7}
     >
+      {isMultiLeg && (
+        <View style={styles.busHoppingBadge}>
+          <Text style={styles.busHoppingBadgeText}>
+            {item.transferCount || 1} Transfer{item.transferCount !== 1 ? 's' : ''}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.cardHeader}>
         <View style={styles.operatorSection}>
           <View style={styles.itemIconContainer}>
@@ -61,72 +77,150 @@ const TransportCard = React.memo(({ item, navigation, fromLocation, toLocation }
             />
           </View>
           <View>
-            <Text style={styles.operatorName}>{yatayatName} Yatayat</Text>
-            <Text style={styles.vehicleType}>{vehicleType?.toUpperCase()}</Text>
+            <Text style={styles.operatorName} numberOfLines={1}>
+              {isMultiLeg ? 
+                `${yatayatName|| 'Multiple'} → ${secondLeg?.yatayatName|| 'Unknown'}` : 
+                `${yatayatName || 'Unknown'}`}
+            </Text>
+            <Text style={styles.vehicleType}>
+              {isMultiLeg ? 
+                `${vehicleType?.toUpperCase() || 'BUS'} → ${secondLeg?.vehicleType?.toUpperCase() || 'BUS'}` : 
+                vehicleType?.toUpperCase() || 'BUS'}
+            </Text>
           </View>
         </View>
         <View style={styles.fareSection}>
-          <Text style={styles.fareLabel}>Fare</Text>
-          <Text style={styles.fareAmount}>Rs. {fare}</Text>
-          {/* {discountedFare > 0 && discountedFare !== fare && (
-            <Text style={styles.discountedFare}>Rs. {discountedFare} Discount</Text>
-          )} */}
-        </View>
-      </View>
-      
-      <View style={styles.divider} />
-      
-      <View style={styles.detailsContainer}>
-
-        <View style={styles.detailRow}>
-          <MaterialCommunityIcons 
-            name="routes" 
-            size={16} 
-            color={colors.secondaryText} 
-            style={styles.detailIcon}
-          />
-          <Text style={styles.detailLabel}>Route:</Text>
-          <Text style={styles.detailValue} numberOfLines={1}>
-            {routeNo} | {routeName}
+          <Text style={styles.fareLabel}>Total Fare</Text>
+          <Text style={styles.fareAmount}>
+            Rs. {isMultiLeg ? 
+              (combinedFare || (fare || 0) + (secondLeg?.fare || 0)) : 
+              fare}
           </Text>
         </View>
-        
-        <View style={styles.detailRow}>
-          <MaterialCommunityIcons 
-            name="clock-outline" 
-            size={16} 
-            color={colors.secondaryText} 
-            style={styles.detailIcon}
-          />
-          <Text style={styles.detailLabel}>Timing:</Text>
-          <Text style={styles.detailValue} numberOfLines={1}>{estimatedTime}</Text>
-        </View>
-        
-        <View style={styles.detailRow}>
-          <MaterialCommunityIcons 
-            name="map-marker-distance" 
-            size={16} 
-            color={colors.secondaryText} 
-            style={styles.detailIcon}
-          />
-          <Text style={styles.detailLabel}>Distance:</Text>
-          <Text style={styles.detailValue}>{distance} km</Text>
-        </View>
-
-        <View style={styles.detailRow}>
-          <MaterialCommunityIcons 
-            name="cash-minus" 
-            size={16} 
-            color={colors.secondaryText} 
-            style={styles.detailIcon}
-          />
-          <Text style={styles.detailLabel}>Discount:</Text>
-          {discountedFare > 0 && discountedFare !== fare && (
-            <Text style={styles.detailValue}>Rs. {discountedFare}</Text>
-          )}
-        </View>
       </View>
-      
+
+      <View style={styles.divider} />
+
+      <View style={styles.detailsContainer}>
+        {isMultiLeg ? (
+          <>
+            <View style={styles.multiLegContainer}>
+              {/* First Leg */}
+              <View style={styles.legContainer}>
+                <Text style={styles.legTitle}>First Transit:</Text>
+                {/* <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="routes" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText} numberOfLines={1}>
+                    {routeNo || 'N/A'} | {routeName || 'Unknown Route'}
+                  </Text>
+                </View> */}
+                <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="map-marker-path" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText} numberOfLines={1}>
+                    {fromLocation} → {transferStop?.stops_name || 'Transfer Point'}
+                  </Text>
+                </View>
+                <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="clock-outline" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText}>
+                    Time: {item.estimatedTime || 'N/A'}
+                  </Text>
+                </View>
+                <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="map-marker-distance" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText}>
+                    Distance: {item.distance || 'N/A'} km
+                  </Text>
+                </View>
+                <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="cash" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText}>
+                    Fare: Rs. {item.fare || 0}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Transfer Information */}
+              <View style={styles.transferInfo}>
+                <MaterialCommunityIcons name="transfer" size={20} color={colors.primary} />
+                <Text style={styles.transferText} numberOfLines={1}>
+                  Change at {transferStop?.stops_name || 'Transfer Point'} to:
+                </Text>
+              </View>
+
+              {/* Second Leg */}
+              <View style={styles.legContainer}>
+                <Text style={styles.legTitle}>Second Transit:</Text>
+                {/* <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="routes" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText} numberOfLines={1}>
+                    {secondLeg?.routeNo || 'N/A'} | {secondLeg?.routeName || 'Unknown Route'}
+                  </Text>
+                </View> */}
+                <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="map-marker-path" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText} numberOfLines={1}>
+                    {transferStop?.stops_name || 'Transfer Point'} → {toLocation}
+                  </Text>
+                </View>
+                <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="clock-outline" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText}>
+                    Time: {secondLeg?.estimatedTime || 'N/A'}
+                  </Text>
+                </View>
+                <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="map-marker-distance" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText}>
+                    Distance: {secondLeg?.distance || 'N/A'} km
+                  </Text>
+                </View>
+                <View style={styles.legDetailRow}>
+                  <MaterialCommunityIcons name="cash" size={16} color={colors.secondaryText} />
+                  <Text style={styles.legDetailText}>
+                    Fare: Rs. {secondLeg?.fare || 0}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Combined Stats Summary */}
+            <View style={styles.combinedStats}>
+              <View style={styles.combinedStat}>
+                <Text style={styles.combinedStatLabel}>Total Distance:</Text>
+                <Text style={styles.combinedStatValue}>{combinedDistance || 'N/A'} km</Text>
+              </View>
+              <View style={styles.combinedStat}>
+                <Text style={styles.combinedStatLabel}>Total Fare:</Text>
+                <Text style={styles.combinedStatValue}>Rs. {combinedFare || 0}</Text>
+              </View>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="routes" size={16} color={colors.secondaryText} />
+              <Text style={styles.detailLabel}>Route:</Text>
+              <Text style={styles.detailValue} numberOfLines={1}>
+                {routeNo || 'Unknown'} | {routeName || 'Unknown Route'}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="clock-outline" size={16} color={colors.secondaryText} />
+              <Text style={styles.detailLabel}>Timing:</Text>
+              <Text style={styles.detailValue} numberOfLines={1}>{estimatedTime || 'N/A'}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="map-marker-distance" size={16} color={colors.secondaryText} />
+              <Text style={styles.detailLabel}>Distance:</Text>
+              <Text style={styles.detailValue}>{distance || 'N/A'} km</Text>
+            </View>
+          </>
+        )}
+      </View>
+
       <View style={styles.cardFooter}>
         <Text style={styles.viewDetailsText}>View Full Details</Text>
         <MaterialCommunityIcons name="chevron-right" size={20} color={colors.primary} />
@@ -154,13 +248,13 @@ const SearchResults = ({ route, navigation }) => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.primaryText} />
         </TouchableOpacity>
-        
-        <View style={styles.headerTitleContainer}>        
-        <Text style={styles.headerSubTitle}>Available Transport</Text> 
+
+        <View style={styles.headerTitleContainer}>
+        <Text style={styles.headerSubTitle}>Available Transport</Text>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {fromLocation} - {toLocation}
           </Text>
-          
+
         </View>
         <View style={styles.headerRightPlaceholder} />
       </View>
@@ -377,6 +471,81 @@ const styles = StyleSheet.create({
     color: colors.background,
     fontWeight: '600',
     fontSize: fontSizes.md,
+  },
+  busHoppingBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    zIndex: 1,
+  },
+  busHoppingBadgeText: {
+    color: colors.background,
+    fontSize: fontSizes.xs,
+    fontWeight: 'bold',
+  },
+  multiLegContainer: {
+    marginVertical: spacing.sm,
+  },
+  legContainer: {
+    marginBottom: spacing.sm,
+  },
+  legTitle: {
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+    color: colors.primaryText,
+    marginBottom: spacing.xs,
+  },
+  legDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: spacing.xxs,
+  },
+  legDetailText: {
+    fontSize: fontSizes.sm,
+    color: colors.primaryText,
+    marginLeft: spacing.sm,
+  },
+  transferInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${colors.primary}10`,
+    padding: spacing.sm,
+    borderRadius: borderRadius.sm,
+    marginVertical: spacing.sm,
+  },
+  transferText: {
+    fontSize: fontSizes.sm,
+    color: colors.primary,
+    fontWeight: '600',
+    marginLeft: spacing.sm,
+  },
+  combinedStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  combinedStat: {
+    alignItems: 'center',
+  },
+  combinedStatLabel: {
+    fontSize: fontSizes.sm,
+    color: colors.secondaryText,
+  },
+  combinedStatValue: {
+    fontSize: fontSizes.md,
+    fontWeight: '600',
+    color: colors.primaryText,
+  },
+  headerSubTitle: {
+    fontSize: fontSizes.sm,
+    color: colors.secondaryText,
   },
 });
 

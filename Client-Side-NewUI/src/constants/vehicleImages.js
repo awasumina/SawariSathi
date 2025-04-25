@@ -6,8 +6,8 @@
 export const vehicleImages = {
     microbus: require('../../assets/microbus.jpg'),
     sajha: require('../../assets/sajha.jpg'),
-    bus: require('../../assets/localbus.jpg'),
+    bus: require('../../assets/localbus.jpeg'),
     tempo: require('../../assets/tempo.jpg'),
     // Add a default image if needed
-    default: require('../../assets/localbus.jpg') // Example: use bus as default
+    default: require('../../assets/localbus.jpeg') // Example: use bus as default
 };
