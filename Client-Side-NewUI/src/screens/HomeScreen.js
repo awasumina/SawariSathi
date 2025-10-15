@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,17 +8,89 @@ import {
   SafeAreaView,
   ScrollView,
   StatusBar,
+  ActivityIndicator,
+  Alert,
+  FlatList,
 } from 'react-native';
 import { colors, spacing, fontSizes, borderRadius } from '../constants/theme';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LocationService } from '../utils/locationService';
 
 const HomeScreen = ({ navigation }) => {
+  const [userLocation, setUserLocation] = useState(null);
+  const [nearbyStops, setNearbyStops] = useState([]);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [nearbyStopsLoading, setNearbyStopsLoading] = useState(false);
+  const [hasLocationPermission, setHasLocationPermission] = useState(false);
+
   const popularRoutes = [
     { name: 'Kavresthali - RNAC', id: 1, icon: 'bus-articulated-front' },
     { name: 'Basnettar - RNAC', id: 2, icon: 'bus' },
     { name: 'Jutpur Fedi - RNAC', id: 3, icon: 'bus-stop' },
     { name: 'Goldhunga - RNAC', id: 4, icon: 'bus-clock' },
   ];
+
+  // Check location permission on mount
+  useEffect(() => {
+    checkLocationPermission();
+  }, []);
+
+  const checkLocationPermission = async () => {
+    try {
+      const hasPermission = await LocationService.hasLocationPermission();
+      setHasLocationPermission(hasPermission);
+    } catch (error) {
+      console.error('Error checking location permission:', error);
+    }
+  };
+
+  const getCurrentLocationAndNearbyStops = async () => {
+    try {
+      setLocationLoading(true);
+      
+      // Get current location
+      const location = await LocationService.getCurrentLocation();
+      setUserLocation(location);
+      setHasLocationPermission(true);
+      
+      // Get nearby stops
+      setNearbyStopsLoading(true);
+      const nearbyData = await LocationService.getNearbyStops(
+        location.latitude, 
+        location.longitude,
+        2 // 2km radius
+      );
+      setNearbyStops(nearbyData.data.slice(0, 5)); // Show only first 5
+      
+    } catch (error) {
+      console.error('Error getting location and nearby stops:', error);
+      Alert.alert(
+        'Location Error',
+        error.message,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Try Again', 
+            onPress: getCurrentLocationAndNearbyStops 
+          }
+        ]
+      );
+    } finally {
+      setLocationLoading(false);
+      setNearbyStopsLoading(false);
+    }
+  };
+
+  const searchFromNearbyStop = (stop) => {
+    navigation.navigate('SearchTab', { 
+      fromLocation: stop.stops_name,
+      searchType: 'fromNearbyStop',
+      nearbyStopInfo: {
+        ...stop,
+        userLocation
+      }
+    });
+  };
 
   const quickActions = [
     { 
@@ -68,21 +140,102 @@ const HomeScreen = ({ navigation }) => {
                 Find the best public transport routes in your city
               </Text>
 
-              {/* Search Card moved to hero section */}
-              <TouchableOpacity
-                style={styles.searchButton}
-                onPress={() => navigation.navigate('SearchTab')}
-              >
-                <MaterialCommunityIcons
-                  name="magnify"
-                  size={24}
-                  color={colors.primary}
-                />
-                <Text style={styles.searchButtonText}>Where are you going?</Text>
-              </TouchableOpacity>
+              {/* Search buttons */}
+              <View style={styles.searchButtonsContainer}>
+                <TouchableOpacity
+                  style={[styles.searchButton, { flex: 1, marginRight: spacing.sm }]}
+                  onPress={() => navigation.navigate('SearchTab')}
+                >
+                  <MaterialCommunityIcons
+                    name="magnify"
+                    size={20}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.searchButtonText}>Search Routes</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.locationButton, locationLoading && styles.locationButtonDisabled]}
+                  onPress={getCurrentLocationAndNearbyStops}
+                  disabled={locationLoading}
+                >
+                  {locationLoading ? (
+                    <ActivityIndicator size="small" color={colors.background} />
+                  ) : (
+                    <MaterialCommunityIcons
+                      name="crosshairs-gps"
+                      size={20}
+                      color={colors.background}
+                    />
+                  )}
+                  <Text style={styles.locationButtonText}>
+                    {locationLoading ? 'Finding...' : 'Near Me'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </ImageBackground>
+
+        {/* Nearby Stops Section */}
+        {nearbyStops.length > 0 && (
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Nearby Bus Stops</Text>
+              {userLocation && (
+                <TouchableOpacity 
+                  onPress={() => navigation.navigate('SearchTab', { 
+                    useCurrentLocation: true, 
+                    userLocation 
+                  })}
+                >
+                  <Text style={styles.viewAllText}>Search from here</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {nearbyStopsLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.loadingText}>Finding nearby stops...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={nearbyStops}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item) => item.id.toString()}
+                contentContainerStyle={styles.horizontalScrollContent}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.nearbyStopCard}
+                    onPress={() => searchFromNearbyStop(item)}
+                  >
+                    <View style={styles.nearbyStopHeader}>
+                      <MaterialCommunityIcons
+                        name="map-marker"
+                        size={20}
+                        color={colors.primary}
+                      />
+                      <View style={styles.distanceChip}>
+                        <Text style={styles.distanceText}>
+                          {LocationService.formatDistance(item.distance)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.nearbyStopName} numberOfLines={2}>
+                      {item.stops_name}
+                    </Text>
+                    <Text style={styles.nearbyStopWalk}>
+                      {LocationService.formatWalkingTime(
+                        LocationService.calculateWalkingTime(item.distance)
+                      )}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+          </View>
+        )}
 
         {/* Quick Actions */}
         <View style={styles.sectionContainer}>
@@ -208,13 +361,17 @@ const styles = StyleSheet.create({
     opacity: 0.9,
     marginBottom: spacing.lg,
   },
+  searchButtonsContainer: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+  },
   searchButton: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.background,
     padding: spacing.md,
     borderRadius: borderRadius.lg,
-    marginTop: spacing.sm,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
@@ -222,10 +379,33 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   searchButtonText: {
-    marginLeft: spacing.sm,
+    marginLeft: spacing.xs,
     color: colors.primaryText,
-    fontSize: fontSizes.md,
+    fontSize: fontSizes.sm,
     fontWeight: '500',
+  },
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    minWidth: 100,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  locationButtonDisabled: {
+    backgroundColor: `${colors.primary}80`,
+  },
+  locationButtonText: {
+    marginLeft: spacing.xs,
+    color: colors.background,
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
   },
   sectionContainer: {
     marginHorizontal: spacing.md,
@@ -350,6 +530,57 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     color: colors.secondaryText,
     lineHeight: 18,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.lg,
+  },
+  loadingText: {
+    marginLeft: spacing.sm,
+    color: colors.secondaryText,
+    fontSize: fontSizes.sm,
+  },
+  nearbyStopCard: {
+    backgroundColor: colors.cardBackground,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    marginLeft: spacing.md,
+    width: 160,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  nearbyStopHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  distanceChip: {
+    backgroundColor: `${colors.primary}15`,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  distanceText: {
+    fontSize: fontSizes.xs,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  nearbyStopName: {
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+    color: colors.primaryText,
+    marginBottom: spacing.xs,
+    lineHeight: 16,
+  },
+  nearbyStopWalk: {
+    fontSize: fontSizes.xs,
+    color: colors.secondaryText,
   },
 });
 

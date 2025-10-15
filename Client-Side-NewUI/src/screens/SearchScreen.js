@@ -15,12 +15,14 @@ import {
     StatusBar,
     FlatList,
     Dimensions,
+    Alert,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import { colors, spacing, fontSizes, borderRadius } from '../constants/theme';
 import { storeData, getData } from '../utils/storage'; // Import storage utils
 import { API_BASE_URL } from '../config/api';
+import { LocationService } from '../utils/locationService';
 // const API_BASE_URL = 'http://192.168.101.2:3000/api'; // Ensure correct IP
 const RECENT_SEARCHES_KEY = '@recent_searches';
 const MAX_RECENT_SEARCHES = 20;
@@ -144,6 +146,9 @@ const SearchScreen = ({ navigation, route }) => {
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [recentSearches, setRecentSearches] = useState([]);
+    const [useCurrentLocation, setUseCurrentLocation] = useState(false);
+    const [userLocation, setUserLocation] = useState(null);
+    const [locationLoading, setLocationLoading] = useState(false);
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -190,8 +195,43 @@ const SearchScreen = ({ navigation, route }) => {
                 setFromLocation(parts[0]);
                 setToLocation(parts[parts.length - 1]);
             }
+        } else if (route.params?.useCurrentLocation) {
+            // Set up for location-based search
+            setUseCurrentLocation(true);
+            setFromLocation('My Location');
+            if (route.params.userLocation) {
+                setUserLocation(route.params.userLocation);
+            }
+        } else if (route.params?.fromLocation) {
+            // Coming from nearby stop selection
+            setFromLocation(route.params.fromLocation);
+            if (route.params.nearbyStopInfo) {
+                setUserLocation(route.params.nearbyStopInfo.userLocation);
+            }
         }
     }, [route.params]);
+
+    // Get current location when user toggles location-based search
+    const handleLocationToggle = async () => {
+        if (!useCurrentLocation) {
+            try {
+                setLocationLoading(true);
+                const location = await LocationService.getCurrentLocation();
+                setUserLocation(location);
+                setFromLocation('My Location');
+                setUseCurrentLocation(true);
+            } catch (error) {
+                Alert.alert('Location Error', error.message);
+                setUseCurrentLocation(false);
+            } finally {
+                setLocationLoading(false);
+            }
+        } else {
+            setUseCurrentLocation(false);
+            setFromLocation('');
+            setUserLocation(null);
+        }
+    };
 
     const filteredLocations = locations.filter(location =>
         location.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -205,6 +245,69 @@ const SearchScreen = ({ navigation, route }) => {
 
         setLoading(true);
         try {
+            // Handle location-based search
+            if (useCurrentLocation && userLocation && LocationService.isCurrentLocationInput(fromLocation)) {
+                const toStop = locations.find(stop => stop.name === toLocation);
+                
+                if (!toStop) {
+                    alert('Destination not found in our database.');
+                    setLoading(false);
+                    return;
+                }
+
+                // Use location-based search
+                const locationRouteData = await LocationService.getRoutesFromCurrentLocation(
+                    userLocation.latitude,
+                    userLocation.longitude,
+                    toStop.id,
+                    2 // 2km radius
+                );
+
+                if (locationRouteData.data && locationRouteData.data.length > 0) {
+                    // Transform location-based results to match expected format
+                    const transformedResults = locationRouteData.data.map(route => {
+                        const transformed = transformRouteData(route, 'location', toStop.id);
+                        
+                        // Add walking information
+                        if (route.walkingToStop) {
+                            transformed.walkingToStop = route.walkingToStop;
+                            transformed.totalJourneyTime = route.totalJourneyTime;
+                        }
+                        
+                        return transformed;
+                    });
+
+                    // Save search and navigate
+                    const newSearch = { 
+                        from: 'My Location', 
+                        to: toLocation, 
+                        timestamp: Date.now(),
+                        isLocationBased: true 
+                    };
+                    const updatedRecents = [newSearch, ...recentSearches.filter(s => 
+                        !(s.from === newSearch.from && s.to === newSearch.to)
+                    )].slice(0, MAX_RECENT_SEARCHES);
+
+                    setRecentSearches(updatedRecents);
+                    await storeData(RECENT_SEARCHES_KEY, updatedRecents);
+
+                    navigation.navigate('SearchResults', {
+                        results: transformedResults,
+                        fromLocation: 'My Location',
+                        toLocation,
+                        isLocationBased: true,
+                        userLocation,
+                        nearbyStops: locationRouteData.nearbyStops
+                    });
+                } else {
+                    alert('No transport options found from your location to this destination.');
+                }
+                
+                setLoading(false);
+                return;
+            }
+
+            // Traditional stop-to-stop search
             const fromStop = locations.find(stop => stop.name === fromLocation);
             const toStop = locations.find(stop => stop.name === toLocation);
 
@@ -504,14 +607,65 @@ const SearchScreen = ({ navigation, route }) => {
                     <View style={styles.inputsContainer}>
                         {/* From Location */}
                         <View style={styles.inputLabelContainer}>
-                            <Text style={styles.inputLabel}>From</Text>
-                            <TouchableOpacity style={[styles.locationInput, fromLocation ? styles.locationInputFilled : null]} onPress={() => { setSearchQuery(''); setShowFromDropdown(true); }}>
-                                <View style={[styles.locationIconWrapper, fromLocation ? styles.locationIconWrapperActive : null]}>
-                                    <Ionicons name="location-sharp" size={16} color={fromLocation ? colors.background : colors.secondaryText} />
+                            <View style={styles.labelWithToggle}>
+                                <Text style={styles.inputLabel}>From</Text>
+                                <TouchableOpacity 
+                                    style={[styles.locationToggle, useCurrentLocation && styles.locationToggleActive]}
+                                    onPress={handleLocationToggle}
+                                    disabled={locationLoading}
+                                >
+                                    {locationLoading ? (
+                                        <ActivityIndicator size="small" color={colors.primary} />
+                                    ) : (
+                                        <MaterialCommunityIcons 
+                                            name={useCurrentLocation ? "crosshairs-gps" : "crosshairs"} 
+                                            size={14} 
+                                            color={useCurrentLocation ? colors.primary : colors.secondaryText}
+                                        />
+                                    )}
+                                    <Text style={[styles.toggleText, useCurrentLocation && styles.toggleTextActive]}>
+                                        Use GPS
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                            <TouchableOpacity 
+                                style={[
+                                    styles.locationInput, 
+                                    fromLocation ? styles.locationInputFilled : null,
+                                    useCurrentLocation && styles.locationInputDisabled
+                                ]} 
+                                onPress={() => {
+                                    if (!useCurrentLocation) {
+                                        setSearchQuery(''); 
+                                        setShowFromDropdown(true);
+                                    }
+                                }}
+                                disabled={useCurrentLocation}
+                            >
+                                <View style={[
+                                    styles.locationIconWrapper, 
+                                    fromLocation ? styles.locationIconWrapperActive : null
+                                ]}>
+                                    <Ionicons 
+                                        name={useCurrentLocation ? "location" : "location-sharp"} 
+                                        size={16} 
+                                        color={fromLocation ? colors.background : colors.secondaryText} 
+                                    />
                                 </View>
-                                <Text style={[styles.inputText, !fromLocation && styles.placeholderText]} numberOfLines={1}>
-                                    {fromLocation || 'Select departure point'}
-                                </Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[
+                                        styles.inputText, 
+                                        !fromLocation && styles.placeholderText,
+                                        useCurrentLocation && styles.locationText
+                                    ]} numberOfLines={1}>
+                                        {fromLocation || 'Select departure point'}
+                                    </Text>
+                                    {useCurrentLocation && userLocation && (
+                                        <Text style={styles.coordinatesText} numberOfLines={1}>
+                                            {userLocation.latitude.toFixed(6)}, {userLocation.longitude.toFixed(6)}
+                                        </Text>
+                                    )}
+                                </View>
                             </TouchableOpacity>
                         </View>
 
@@ -877,6 +1031,48 @@ const styles = StyleSheet.create({
     arrowText: {
         color: colors.secondaryText,
         fontWeight: 'bold',
+    },
+    labelWithToggle: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    locationToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: borderRadius.sm,
+        backgroundColor: colors.background,
+        borderWidth: 1,
+        borderColor: colors.border,
+    },
+    locationToggleActive: {
+        backgroundColor: `${colors.primary}10`,
+        borderColor: colors.primary,
+    },
+    toggleText: {
+        marginLeft: spacing.xs,
+        fontSize: fontSizes.xs,
+        color: colors.secondaryText,
+        fontWeight: '500',
+    },
+    toggleTextActive: {
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    locationInputDisabled: {
+        backgroundColor: colors.highlight,
+        opacity: 0.8,
+    },
+    locationText: {
+        color: colors.primary,
+        fontWeight: '600',
+    },
+    coordinatesText: {
+        fontSize: fontSizes.xs,
+        color: colors.secondaryText,
+        marginTop: 2,
     },
 });
 

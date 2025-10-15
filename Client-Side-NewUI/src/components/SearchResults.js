@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, fontSizes, borderRadius } from '../constants/theme';
+import { WalkingDirections, MultiWalkingDirections } from './WalkingDirections';
+import { LocationService } from '../utils/locationService';
 
 const getVehicleIconName = (type) => {
     switch (type?.toLowerCase()) {
@@ -220,6 +222,29 @@ const TransportCard = React.memo(({ item, navigation, fromLocation, toLocation }
           </>
         )}
       </View>
+
+      {/* Walking Directions for Location-based Results */}
+      {item.walkingToStop && (
+        <WalkingDirections walkingInfo={item.walkingToStop} />
+      )}
+      
+      {item.walkingInfo && (
+        <MultiWalkingDirections walkingInfo={item.walkingInfo} />
+      )}
+
+      {/* Total Journey Time for Location-based Results */}
+      {item.totalJourneyTime && (
+        <View style={styles.journeyTimeContainer}>
+          <MaterialCommunityIcons 
+            name="clock-fast" 
+            size={16} 
+            color={colors.primary} 
+          />
+          <Text style={styles.journeyTimeText}>
+            Total Journey Time: {item.totalJourneyTime} minutes
+          </Text>
+        </View>
+      )}
 
       <View style={styles.cardFooter}>
         <Text style={styles.viewDetailsText}>View Full Details</Text>
@@ -546,6 +571,21 @@ const styles = StyleSheet.create({
   headerSubTitle: {
     fontSize: fontSizes.sm,
     color: colors.secondaryText,
+  },
+  journeyTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: `${colors.primary}10`,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    marginTop: spacing.sm,
+  },
+  journeyTimeText: {
+    fontSize: fontSizes.sm,
+    fontWeight: '600',
+    color: colors.primary,
+    marginLeft: spacing.xs,
   },
 });
 

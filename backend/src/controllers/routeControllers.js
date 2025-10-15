@@ -1,17 +1,509 @@
 import supabase from "../config/supabaseClient.js";
 
+// Helper function to calculate distance between two coordinates using Haversine formula
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c;
+  return distance;
+};
+
+// Find nearby bus stops within a specified radius from user's location
+export const getNearbyStops = async (req, res) => {
+  const { latitude, longitude, radius = 2 } = req.query; // radius in kilometers, default 2km
+
+  try {
+    console.log(`Finding nearby stops for location: lat=${latitude}, lng=${longitude}, radius=${radius}km`);
+
+    // Validate input
+    if (!latitude || !longitude) {
+      return res.status(400).json({ error: "Latitude and longitude are required" });
+    }
+
+    const userLat = parseFloat(latitude);
+    const userLon = parseFloat(longitude);
+    const searchRadius = parseFloat(radius);
+
+    // Validate coordinates
+    if (isNaN(userLat) || isNaN(userLon) || isNaN(searchRadius)) {
+      return res.status(400).json({ error: "Invalid coordinates or radius provided" });
+    }
+
+    // Get all bus stops
+    const { data: allStops, error: stopsError } = await supabase
+      .from("stops")
+      .select("id, stops_name, stops_lat, stops_lon");
+
+    if (stopsError) {
+      console.error("Error fetching stops:", stopsError.message);
+      throw stopsError;
+    }
+
+    // Filter stops within the specified radius
+    const nearbyStops = allStops
+      .map(stop => {
+        const stopLat = parseFloat(stop.stops_lat);
+        const stopLon = parseFloat(stop.stops_lon);
+        
+        // Skip stops with invalid coordinates
+        if (isNaN(stopLat) || isNaN(stopLon)) {
+          return null;
+        }
+
+        const distance = calculateDistance(userLat, userLon, stopLat, stopLon);
+        
+        return {
+          ...stop,
+          distance: Math.round(distance * 100) / 100 // Round to 2 decimal places
+        };
+      })
+      .filter(stop => stop !== null && stop.distance <= searchRadius)
+      .sort((a, b) => a.distance - b.distance); // Sort by distance
+
+    console.log(`Found ${nearbyStops.length} stops within ${searchRadius}km radius`);
+
+    res.json({ 
+      data: nearbyStops,
+      userLocation: { latitude: userLat, longitude: userLon },
+      searchRadius: searchRadius
+    });
+
+  } catch (err) {
+    console.error("Error finding nearby stops:", err.message);
+    res.status(500).json({ error: "Internal server error", message: err.message });
+  }
+};
+
+// Find routes between two geographical locations (both as coordinates)
+export const getRoutesBetweenLocations = async (req, res) => {
+  const { fromLat, fromLng, toLat, toLng, radius = 2 } = req.query;
+
+  try {
+    console.log(`Finding routes between locations: from (${fromLat}, ${fromLng}) to (${toLat}, ${toLng})`);
+
+    // Validate input
+    if (!fromLat || !fromLng || !toLat || !toLng) {
+      return res.status(400).json({ 
+        error: "fromLat, fromLng, toLat, and toLng are required" 
+      });
+    }
+
+    const searchRadius = parseFloat(radius);
+    
+    // Get all bus stops
+    const { data: allStops, error: stopsError } = await supabase
+      .from("stops")
+      .select("id, stops_name, stops_lat, stops_lon");
+
+    if (stopsError) {
+      console.error("Error fetching stops:", stopsError.message);
+      throw stopsError;
+    }
+
+    // Find nearby stops for source location
+    const sourceStops = allStops
+      .map(stop => {
+        const stopLat = parseFloat(stop.stops_lat);
+        const stopLon = parseFloat(stop.stops_lon);
+        
+        if (isNaN(stopLat) || isNaN(stopLon)) return null;
+
+        const distance = calculateDistance(parseFloat(fromLat), parseFloat(fromLng), stopLat, stopLon);
+        
+        return {
+          ...stop,
+          distance: Math.round(distance * 100) / 100,
+          type: 'source'
+        };
+      })
+      .filter(stop => stop !== null && stop.distance <= searchRadius)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 3); // Limit to closest 3 source stops
+
+    // Find nearby stops for destination location
+    const destinationStops = allStops
+      .map(stop => {
+        const stopLat = parseFloat(stop.stops_lat);
+        const stopLon = parseFloat(stop.stops_lon);
+        
+        if (isNaN(stopLat) || isNaN(stopLon)) return null;
+
+        const distance = calculateDistance(parseFloat(toLat), parseFloat(toLng), stopLat, stopLon);
+        
+        return {
+          ...stop,
+          distance: Math.round(distance * 100) / 100,
+          type: 'destination'
+        };
+      })
+      .filter(stop => stop !== null && stop.distance <= searchRadius)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 3); // Limit to closest 3 destination stops
+
+    if (sourceStops.length === 0 || destinationStops.length === 0) {
+      return res.json({
+        data: [],
+        message: `No bus stops found within ${searchRadius}km of source or destination location`,
+        sourceStops,
+        destinationStops
+      });
+    }
+
+    console.log(`Found ${sourceStops.length} source stops and ${destinationStops.length} destination stops`);
+
+    // Find routes between each combination of source and destination stops
+    const allRouteOptions = [];
+
+    for (const sourceStop of sourceStops) {
+      for (const destStop of destinationStops) {
+        try {
+          const routeData = await findRoutesBetweenStops(sourceStop.id, destStop.id);
+          
+          if (routeData && routeData.length > 0) {
+            routeData.forEach(route => {
+              route.walkingInfo = {
+                toSourceStop: {
+                  stopName: sourceStop.stops_name,
+                  distance: sourceStop.distance,
+                  estimatedTime: Math.round(sourceStop.distance * 12),
+                  stopId: sourceStop.id,
+                  coordinates: {
+                    latitude: parseFloat(sourceStop.stops_lat),
+                    longitude: parseFloat(sourceStop.stops_lon)
+                  }
+                },
+                fromDestStop: {
+                  stopName: destStop.stops_name,
+                  distance: destStop.distance,
+                  estimatedTime: Math.round(destStop.distance * 12),
+                  stopId: destStop.id,
+                  coordinates: {
+                    latitude: parseFloat(destStop.stops_lat),
+                    longitude: parseFloat(destStop.stops_lon)
+                  }
+                }
+              };
+              route.totalJourneyTime = 
+                route.walkingInfo.toSourceStop.estimatedTime + 
+                (route.estimatedTime || 30) +
+                route.walkingInfo.fromDestStop.estimatedTime;
+            });
+            
+            allRouteOptions.push(...routeData);
+          }
+        } catch (error) {
+          console.error(`Error finding routes between stops ${sourceStop.id} and ${destStop.id}:`, error.message);
+        }
+      }
+    }
+
+    // Sort by total journey time
+    allRouteOptions.sort((a, b) => {
+      const timeA = a.totalJourneyTime || 999;
+      const timeB = b.totalJourneyTime || 999;
+      return timeA - timeB;
+    });
+
+    console.log(`Found ${allRouteOptions.length} total route options between locations`);
+
+    res.json({
+      data: allRouteOptions,
+      sourceLocation: { latitude: parseFloat(fromLat), longitude: parseFloat(fromLng) },
+      destinationLocation: { latitude: parseFloat(toLat), longitude: parseFloat(toLng) },
+      sourceStops,
+      destinationStops,
+      searchRadius
+    });
+
+  } catch (err) {
+    console.error("Error finding routes between locations:", err.message);
+    res.status(500).json({ error: "Internal server error", message: err.message });
+  }
+};
+
+// Find routes from user's current location to a destination stop
+export const getRoutesFromLocation = async (req, res) => {
+  const { latitude, longitude, destinationStopId, radius = 2 } = req.query;
+
+  try {
+    console.log(`Finding routes from location: lat=${latitude}, lng=${longitude} to stop: ${destinationStopId}`);
+
+    // Validate input
+    if (!latitude || !longitude || !destinationStopId) {
+      return res.status(400).json({ 
+        error: "Latitude, longitude, and destinationStopId are required" 
+      });
+    }
+
+    const userLat = parseFloat(latitude);
+    const userLon = parseFloat(longitude);
+    const searchRadius = parseFloat(radius);
+
+    // Validate coordinates
+    if (isNaN(userLat) || isNaN(userLon) || isNaN(searchRadius)) {
+      return res.status(400).json({ error: "Invalid coordinates or radius provided" });
+    }
+
+    // First, find nearby stops
+    const { data: allStops, error: stopsError } = await supabase
+      .from("stops")
+      .select("id, stops_name, stops_lat, stops_lon");
+
+    if (stopsError) {
+      console.error("Error fetching stops:", stopsError.message);
+      throw stopsError;
+    }
+
+    // Filter nearby stops
+    const nearbyStops = allStops
+      .map(stop => {
+        const stopLat = parseFloat(stop.stops_lat);
+        const stopLon = parseFloat(stop.stops_lon);
+        
+        if (isNaN(stopLat) || isNaN(stopLon)) {
+          return null;
+        }
+
+        const distance = calculateDistance(userLat, userLon, stopLat, stopLon);
+        
+        return {
+          ...stop,
+          distance: Math.round(distance * 100) / 100
+        };
+      })
+      .filter(stop => stop !== null && stop.distance <= searchRadius)
+      .sort((a, b) => a.distance - b.distance);
+
+    if (nearbyStops.length === 0) {
+      return res.json({
+        data: [],
+        message: `No bus stops found within ${searchRadius}km of your location`,
+        userLocation: { latitude: userLat, longitude: userLon },
+        nearbyStops: []
+      });
+    }
+
+    console.log(`Found ${nearbyStops.length} nearby stops, searching for routes...`);
+
+    // Now find routes from each nearby stop to the destination
+    const allRouteOptions = [];
+
+    for (const nearbyStop of nearbyStops.slice(0, 5)) { // Limit to closest 5 stops to avoid too many requests
+      try {
+        // Use existing logic to find routes between stops
+        const routeData = await findRoutesBetweenStops(nearbyStop.id, destinationStopId);
+        
+        if (routeData && routeData.length > 0) {
+          // Add walking distance/time information to each route option
+          routeData.forEach(route => {
+            route.walkingToStop = {
+              stopName: nearbyStop.stops_name,
+              distance: nearbyStop.distance,
+              estimatedTime: Math.round(nearbyStop.distance * 12), // Assume 5km/h walking speed = 12 minutes per km
+              stopId: nearbyStop.id,
+              coordinates: {
+                latitude: parseFloat(nearbyStop.stops_lat),
+                longitude: parseFloat(nearbyStop.stops_lon)
+              }
+            };
+            route.totalJourneyTime = route.walkingToStop.estimatedTime + (route.estimatedTime || 30);
+          });
+          
+          allRouteOptions.push(...routeData);
+        }
+      } catch (error) {
+        console.error(`Error finding routes from stop ${nearbyStop.id}:`, error.message);
+        // Continue with other stops even if one fails
+      }
+    }
+
+    // Sort routes by total journey time (walking + transit)
+    allRouteOptions.sort((a, b) => {
+      const timeA = a.totalJourneyTime || 999;
+      const timeB = b.totalJourneyTime || 999;
+      return timeA - timeB;
+    });
+
+    console.log(`Found ${allRouteOptions.length} total route options`);
+
+    res.json({
+      data: allRouteOptions,
+      userLocation: { latitude: userLat, longitude: userLon },
+      nearbyStops: nearbyStops.slice(0, 5),
+      searchRadius: searchRadius
+    });
+
+  } catch (err) {
+    console.error("Error finding routes from location:", err.message);
+    res.status(500).json({ error: "Internal server error", message: err.message });
+  }
+};
+
+// Helper function to find routes between two stops (extracted from existing logic)
+async function findRoutesBetweenStops(stop1, stop2) {
+  try {
+    // STEP 1: Check for direct routes (both stops on the same route)
+    const { data: directRouteData, error: directRouteError } = await supabase
+      .from("route_stops")
+      .select("route_id, stops_id, sequence")
+      .in("stops_id", [stop1, stop2]);
+
+    if (directRouteError) {
+      console.error("Error fetching direct routes:", directRouteError.message);
+      throw directRouteError;
+    }
+
+    // Process direct routes
+    const directRoutesMap = {};
+    directRouteData.forEach(item => {
+      const routeId = item.route_id;
+      const stopId = String(item.stops_id);
+     
+      if (!directRoutesMap[routeId]) {
+        directRoutesMap[routeId] = { stops: new Set(), sequences: {} };
+      }
+     
+      directRoutesMap[routeId].stops.add(stopId);
+      directRoutesMap[routeId].sequences[stopId] = item.sequence;
+    });
+
+    // Find routes that contain both stops
+    const directRoutes = Object.keys(directRoutesMap).filter(
+      routeId =>
+        directRoutesMap[routeId].stops.has(String(stop1)) &&
+        directRoutesMap[routeId].stops.has(String(stop2))
+    );
+
+    if (directRoutes.length > 0) {
+      console.log(`Found ${directRoutes.length} direct routes between stops ${stop1} and ${stop2}`);
+      const directRouteDetails = await Promise.all(
+        directRoutes.map(async (routeId) => {
+          return await getDirectRouteDetails(routeId, stop1, stop2, directRoutesMap[routeId]);
+        })
+      );
+      return directRouteDetails.filter(route => route !== null);
+    }
+
+    // STEP 2: Find transfer routes (similar to existing logic but simplified)
+    console.log("No direct routes found, searching for transfers...");
+    
+    // Get all routes with their stops for transfer route calculation
+    const { data: allRouteStops, error: allRouteStopsError } = await supabase
+      .from("route_stops")
+      .select("route_id, stops_id, sequence")
+      .order("sequence", { ascending: true });
+
+    if (allRouteStopsError) {
+      console.error("Error fetching all route stops:", allRouteStopsError.message);
+      throw allRouteStopsError;
+    }
+
+    // Create mappings
+    const routeToStops = {};
+    const stopToRoutes = {};
+
+    allRouteStops.forEach(item => {
+      const routeId = String(item.route_id);
+      const stopId = String(item.stops_id);
+      const sequence = item.sequence;
+     
+      if (!routeToStops[routeId]) {
+        routeToStops[routeId] = [];
+      }
+      routeToStops[routeId].push({ stopId, sequence });
+     
+      if (!stopToRoutes[stopId]) {
+        stopToRoutes[stopId] = [];
+      }
+      stopToRoutes[stopId].push({ routeId, sequence });
+    });
+
+    // Sort stops by sequence for each route
+    Object.keys(routeToStops).forEach(routeId => {
+      routeToStops[routeId].sort((a, b) => a.sequence - b.sequence);
+    });
+
+    // Find routes that have stop1 and stop2
+    const routesWithStop1 = stopToRoutes[String(stop1)] || [];
+    const routesWithStop2 = stopToRoutes[String(stop2)] || [];
+
+    // Find transfer routes
+    const transferRoutes = [];
+
+    for (const route1 of routesWithStop1) {
+      for (const route2 of routesWithStop2) {
+        if (route1.routeId === route2.routeId) continue;
+       
+        const stops1 = routeToStops[route1.routeId].map(s => s.stopId);
+        const stops2 = routeToStops[route2.routeId].map(s => s.stopId);
+       
+        const commonStops = stops1.filter(stop => stops2.includes(stop));
+       
+        if (commonStops.length > 0) {
+          for (const transferStop of commonStops) {
+            if (transferStop === String(stop1) || transferStop === String(stop2)) continue;
+           
+            transferRoutes.push({
+              fromRoute: route1.routeId,
+              toRoute: route2.routeId,
+              transferStop
+            });
+          }
+        }
+      }
+    }
+
+    if (transferRoutes.length === 0) {
+      return [];
+    }
+
+    // Process transfer routes
+    const transferRouteDetails = await Promise.all(
+      transferRoutes.slice(0, 3).map(async (transfer) => { // Limit to 3 transfer options
+        return await getTransferRouteDetails(
+          transfer.fromRoute,
+          transfer.toRoute,
+          transfer.transferStop,
+          stop1,
+          stop2,
+          routeToStops
+        );
+      })
+    );
+
+    return transferRouteDetails.filter(route => route !== null);
+
+  } catch (err) {
+    console.error(`Error in findRoutesBetweenStops for stops ${stop1} to ${stop2}:`, err.message);
+    throw err;
+  }
+}
+
 
 export const getStopsForRoutes = async (req, res) => {
- const { stop1, stop2 } = req.query;
-
+ const { stop1, stop2, latitude, longitude, radius = 2 } = req.query;
 
  try {
+   // Check if this is a location-based query (from user's current location)
+   if (latitude && longitude && stop2 && !stop1) {
+     console.log(`Location-based query: lat=${latitude}, lng=${longitude} to stop=${stop2}`);
+     
+     // Use the new location-based function
+     req.query.destinationStopId = stop2;
+     return getRoutesFromLocation(req, res);
+   }
+
    console.log(`Received query for stops: stop1=${stop1}, stop2=${stop2}`);
 
-
-   // Validate input
+   // Validate input for traditional stop-to-stop search
    if (!stop1 || !stop2) {
-     return res.status(400).json({ error: "Both stop1 and stop2 are required" });
+     return res.status(400).json({ error: "Both stop1 and stop2 are required, or provide latitude/longitude with stop2 for location-based search" });
    }
 
 

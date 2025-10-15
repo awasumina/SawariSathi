@@ -5,8 +5,11 @@ import {
   getFare, 
   getYatayatId,
   getStopsForRoutes,
-  getVehicleImage  ,
-  getAllStops
+  getVehicleImage,
+  getAllStops,
+  getNearbyStops,
+  getRoutesFromLocation,
+  getRoutesBetweenLocations
 } from '../controllers/routeControllers.js';
  
 import {
@@ -31,6 +34,11 @@ router.get('/stops', getAllStops);
 router.get('/yatayatById/:id', getYatayatId);
 router.get('/routes/stops', getStopsForRoutes);
 router.get('/yatayat/vehicleImage', getVehicleImage);
+
+// New location-based routes
+router.get('/routes/nearby-stops', getNearbyStops);
+router.get('/routes/from-location', getRoutesFromLocation);
+router.get('/routes/between-locations', getRoutesBetweenLocations);
 
 
 //dashboard
