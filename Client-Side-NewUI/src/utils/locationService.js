@@ -152,13 +152,18 @@ export class LocationService {
     try {
       console.log('Smart route search:', { fromInput, toInput, hasLocation: !!userLocation });
 
+      // Validate inputs
+      if (!fromInput || !toInput || !Array.isArray(allStops)) {
+        throw new Error('Invalid search parameters provided');
+      }
+
       // Case 1: From input is "My Location" or similar and we have user location
       if (this.isCurrentLocationInput(fromInput) && userLocation) {
         console.log('Location-based search detected (GPS)');
         
         // Find the destination stop
         const destinationStop = allStops.find(
-          stop => stop.stops_name.toLowerCase() === toInput.toLowerCase()
+          stop => (stop.stops_name || stop.name || '').toLowerCase() === toInput.toLowerCase()
         );
         
         if (destinationStop) {
@@ -190,7 +195,7 @@ export class LocationService {
         } else {
           // From is coordinates, to is stop name
           const destinationStop = allStops.find(
-            stop => stop.stops_name.toLowerCase() === toInput.toLowerCase()
+            stop => (stop.stops_name || stop.name || '').toLowerCase() === toInput.toLowerCase()
           );
           
           if (destinationStop) {
@@ -212,14 +217,14 @@ export class LocationService {
         
         // From should be a stop name
         const fromStop = allStops.find(stop => 
-          stop.stops_name.toLowerCase() === fromInput.toLowerCase()
+          (stop.stops_name || stop.name || '').toLowerCase() === fromInput.toLowerCase()
         );
         
         if (fromStop) {
           // From stop to coordinates
           return await this.getRoutesBetweenLocations(
-            parseFloat(fromStop.lat),
-            parseFloat(fromStop.lon),
+            parseFloat(fromStop.stops_lat || fromStop.lat),
+            parseFloat(fromStop.stops_lon || fromStop.lon),
             toCoords.latitude,
             toCoords.longitude
           );
@@ -230,10 +235,10 @@ export class LocationService {
 
       // Case 4: Both inputs are location names (traditional search)
       const fromStop = allStops.find(stop => 
-        stop.stops_name.toLowerCase() === fromInput.toLowerCase()
+        (stop.stops_name || stop.name || '').toLowerCase() === fromInput.toLowerCase()
       );
       const toStop = allStops.find(stop => 
-        stop.stops_name.toLowerCase() === toInput.toLowerCase()
+        (stop.stops_name || stop.name || '').toLowerCase() === toInput.toLowerCase()
       );
       
       if (fromStop && toStop) {

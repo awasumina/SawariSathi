@@ -157,7 +157,9 @@ const SearchScreen = ({ navigation, route }) => {
                 // Fetch locations
                 const res = await axios.get(`${API_BASE_URL}/stops`);
                 const uniqueLocations = res.data.data.reduce((acc, current) => {
-                    if (!acc.find(item => item.name === current.stops_name)) {
+                    // Add null/undefined checks
+                    if (current && current.stops_name && current.id && 
+                        !acc.find(item => item.name === current.stops_name)) {
                         acc.push({
                             id: current.id,
                             name: current.stops_name,
@@ -167,6 +169,8 @@ const SearchScreen = ({ navigation, route }) => {
                     }
                     return acc;
                 }, []);
+                
+                console.log(`Loaded ${uniqueLocations.length} unique locations`);
                 setLocations(uniqueLocations);
 
                 // Load recent searches
@@ -234,6 +238,7 @@ const SearchScreen = ({ navigation, route }) => {
     };
 
     const filteredLocations = locations.filter(location =>
+        location && location.name && 
         location.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
@@ -245,10 +250,17 @@ const SearchScreen = ({ navigation, route }) => {
 
         setLoading(true);
         try {
+            // Validate inputs before calling smart search
+            if (!fromLocation || !toLocation) {
+                alert('Please select valid departure and destination points.');
+                setLoading(false);
+                return;
+            }
+
             // Use the enhanced smart route search that handles all cases
             const routeData = await LocationService.smartRouteSearch(
-                fromLocation,
-                toLocation,
+                fromLocation.trim(),
+                toLocation.trim(),
                 userLocation,
                 locations
             );
@@ -336,11 +348,15 @@ const SearchScreen = ({ navigation, route }) => {
             let errorMessage = 'Failed to find routes. ';
             
             if (error.message.includes('coordinates')) {
-                errorMessage += 'Please check your coordinate format (e.g., "27.7172, 85.3240").';
+                errorMessage = 'Please check your coordinate format (e.g., "27.7172, 85.3240").';
             } else if (error.message.includes('not found')) {
-                errorMessage += error.message;
+                errorMessage = error.message;
+            } else if (error.message.includes('Invalid search parameters')) {
+                errorMessage = 'Please select valid locations and try again.';
+            } else if (error.message.includes('Network')) {
+                errorMessage = 'Network error. Please check your internet connection and try again.';
             } else {
-                errorMessage += 'Please try again.';
+                errorMessage = 'Unable to find routes. Please verify your selections and try again.';
             }
             
             alert(errorMessage);
@@ -517,32 +533,39 @@ const SearchScreen = ({ navigation, route }) => {
                         </View>
                         <FlatList
                             data={(() => {
-                                const specialOptions = [];
-                                
-                                // Add "My Location" option if GPS is available and this is the FROM dropdown
-                                if (userLocation && visible && showFromDropdown) {
-                                    if (!searchQuery || LocationService.isCurrentLocationInput(searchQuery)) {
-                                        specialOptions.push({
-                                            id: 'my-location',
-                                            name: 'My Location',
-                                            isMyLocation: true,
-                                            coordinates: userLocation
-                                        });
+                                try {
+                                    const specialOptions = [];
+                                    
+                                    // Add "My Location" option if GPS is available and this is the FROM dropdown
+                                    if (userLocation && visible && showFromDropdown) {
+                                        if (!searchQuery || LocationService.isCurrentLocationInput(searchQuery)) {
+                                            specialOptions.push({
+                                                id: 'my-location',
+                                                name: 'My Location',
+                                                isMyLocation: true,
+                                                coordinates: userLocation
+                                            });
+                                        }
                                     }
+                                    
+                                    // Check if the search query looks like coordinates
+                                    if (searchQuery && searchQuery.trim()) {
+                                        const coordinates = LocationService.parseCoordinateInput(searchQuery);
+                                        if (coordinates && LocationService.looksLikeCoordinates(searchQuery)) {
+                                            specialOptions.push({
+                                                id: 'coordinates',
+                                                name: searchQuery.trim(),
+                                                isCoordinates: true,
+                                                coordinates
+                                            });
+                                        }
+                                    }
+                                    
+                                    return [...specialOptions, ...(filteredLocations || [])];
+                                } catch (error) {
+                                    console.error('Error in dropdown data creation:', error);
+                                    return filteredLocations || [];
                                 }
-                                
-                                // Check if the search query looks like coordinates
-                                const coordinates = LocationService.parseCoordinateInput(searchQuery);
-                                if (coordinates && LocationService.looksLikeCoordinates(searchQuery)) {
-                                    specialOptions.push({
-                                        id: 'coordinates',
-                                        name: searchQuery,
-                                        isCoordinates: true,
-                                        coordinates
-                                    });
-                                }
-                                
-                                return [...specialOptions, ...filteredLocations];
                             })()}
                             keyExtractor={(item) => item.id.toString()}
                             renderItem={({ item: location }) => (
