@@ -28,38 +28,50 @@ const VehicleDetails = ({ route, navigation }) => {
   const [isLoadingFavorite, setIsLoadingFavorite] = useState(true);
 
   // Enhanced safeTransport object to include multi-leg journey properties
-  const safeTransport = React.useMemo(() => ({
-    id: transport?.id || `vehicle-${Math.random()}`,
-    vehicle: {
-      type: transport?.vehicle?.type || transport?.vehicleType || 'Bus',
-      name: transport?.vehicle?.name || transport?.routeName || 'Unknown Service',
-      count: transport?.vehicle?.count || 'N/A',
-    },
-    stops: transport?.stops?.map(stop => ({
-      name: stop.stops_name || 'Unknown Stop',
-      lat: parseFloat(stop.stops_lat) || 0,
-      lon: parseFloat(stop.stops_lon) || 0
-    })) || [],
-    fare: transport?.fare ?? 0,
-    discountedFare: transport?.discountedFare ?? null,
-    distance: transport?.distance || 'N/A',
-    routeNo: transport?.routeNo || 'N/A',
-    routeName: transport?.routeName || 'Unknown Route',
-    routeNumber: transport?.routeNo || 'N/A',
-    timing: transport?.estimatedTime || 'N/A',
-    vehicleType: transport?.vehicleType || 'bus',
-    yatayatName: transport?.yatayatName || 'Unknown Operator',
-    // Multi-leg journey properties
-    isMultiLeg: transport?.isMultiLeg || false,
-    secondLeg: transport?.secondLeg || null,
-    transferStop: transport?.transferStop || null,
-    transferCount: transport?.transferCount || 1,
-    combinedFare: transport?.combinedFare || 0,
-    combinedDistance: transport?.combinedDistance || 0,
-    // Include from/to in the saved object
-    fromLocation: fromLocation,
-    toLocation: toLocation,
-  }), [transport, fromLocation, toLocation]);
+  const safeTransport = React.useMemo(() => {
+    console.log("Raw transport data:", transport);
+    
+    const result = {
+      id: transport?.id || `vehicle-${Math.random()}`,
+      vehicle: {
+        type: transport?.vehicle?.type || transport?.vehicleType || 'Bus',
+        name: transport?.vehicle?.name || transport?.routeName || 'Unknown Service',
+        count: transport?.vehicle?.count || 'N/A',
+      },
+      stops: transport?.stops?.map(stop => ({
+        name: stop.stops_name || stop.name || 'Unknown Stop',
+        stops_name: stop.stops_name || stop.name || 'Unknown Stop', // Add both formats
+        lat: parseFloat(stop.stops_lat || stop.lat) || 0,
+        lon: parseFloat(stop.stops_lon || stop.lon) || 0,
+        stops_lat: stop.stops_lat || stop.lat,
+        stops_lon: stop.stops_lon || stop.lon
+      })) || [],
+      fare: transport?.fare ?? 0,
+      discountedFare: transport?.discountedFare ?? null,
+      distance: transport?.distance || 'N/A',
+      routeNo: transport?.routeNo || 'N/A',
+      routeName: transport?.routeName || 'Unknown Route',
+      routeNumber: transport?.routeNo || 'N/A',
+      timing: transport?.estimatedTime || 'N/A',
+      vehicleType: transport?.vehicleType || 'bus',
+      yatayatName: transport?.yatayatName || 'Unknown Operator',
+      // Multi-leg journey properties
+      isMultiLeg: transport?.isMultiLeg || false,
+      secondLeg: transport?.secondLeg || null,
+      transferStop: transport?.transferStop || null,
+      transferCount: transport?.transferCount || 1,
+      combinedFare: transport?.combinedFare || 0,
+      combinedDistance: transport?.combinedDistance || 0,
+      // Include from/to in the saved object
+      fromLocation: fromLocation,
+      toLocation: toLocation,
+    };
+    
+    console.log("SafeTransport processed:", result);
+    console.log("Stops count:", result.stops.length);
+    
+    return result;
+  }, [transport, fromLocation, toLocation]);
 
   useEffect(() => {
     const checkFavoriteStatus = async () => {
@@ -133,40 +145,45 @@ const VehicleDetails = ({ route, navigation }) => {
     navigation.navigate('MapScreen', mapParams);
   };
 
-  const RouteStop = ({ stop, isFirst, isLast, isTransfer }) => (
-    <View style={styles.stopContainer}>
-      <View style={styles.stopIndicator}>
-        {isFirst ? (
-          <View style={[styles.dot, styles.startDot]}>
-            <MaterialCommunityIcons name="flag-variant" size={16} color={colors.background} />
-          </View>
-        ) : isLast ? (
-          <View style={[styles.dot, styles.endDot]}>
-            <MaterialCommunityIcons name="flag-checkered" size={16} color={colors.background} />
-          </View>
-        ) : isTransfer ? (
-          <View style={[styles.dot, styles.transferDot]}>
-            <MaterialCommunityIcons name="transfer" size={16} color={colors.background} />
-          </View>
-        ) : (
-          <View style={styles.dot} />
-        )}
-        {!isLast && <View style={styles.line} />}
+  const RouteStop = ({ stop, isFirst, isLast, isTransfer }) => {
+    // Handle both stop.name and stop.stops_name formats
+    const stopName = stop.name || stop.stops_name || 'Unknown Stop';
+    
+    return (
+      <View style={styles.stopContainer}>
+        <View style={styles.stopIndicator}>
+          {isFirst ? (
+            <View style={[styles.dot, styles.startDot]}>
+              <MaterialCommunityIcons name="flag-variant" size={16} color={colors.background} />
+            </View>
+          ) : isLast ? (
+            <View style={[styles.dot, styles.endDot]}>
+              <MaterialCommunityIcons name="flag-checkered" size={16} color={colors.background} />
+            </View>
+          ) : isTransfer ? (
+            <View style={[styles.dot, styles.transferDot]}>
+              <MaterialCommunityIcons name="transfer" size={16} color={colors.background} />
+            </View>
+          ) : (
+            <View style={styles.dot} />
+          )}
+          {!isLast && <View style={styles.line} />}
+        </View>
+        <View style={styles.stopDetails}>
+          <Text style={[
+            styles.stopText,
+            (isFirst || isLast) && styles.terminalStopText,
+            isTransfer && styles.transferStopText
+          ]}>
+            {stopName}
+          </Text>
+          {isTransfer && (
+            <Text style={styles.transferLabel}>Transfer Point</Text>
+          )}
+        </View>
       </View>
-      <View style={styles.stopDetails}>
-        <Text style={[
-          styles.stopText,
-          (isFirst || isLast) && styles.terminalStopText,
-          isTransfer && styles.transferStopText
-        ]}>
-          {stop.name || stop.stops_name}
-        </Text>
-        {isTransfer && (
-          <Text style={styles.transferLabel}>Transfer Point</Text>
-        )}
-      </View>
-    </View>
-  );
+    );
+  };
 
   const imageSource = vehicleImages[safeTransport.vehicleType?.toLowerCase()] || vehicleImages.bus;
 
@@ -196,19 +213,54 @@ const VehicleDetails = ({ route, navigation }) => {
         setSecondLegStops(safeTransport.secondLeg.stops);
       }
     } else {
-      const fromIndex = safeTransport.stops.findIndex(stop => stop.name === fromLocation);
-      const toIndex = safeTransport.stops.findIndex(stop => stop.name === toLocation);
+      // Enhanced logic for filtering stops between fromLocation and toLocation
+      if (!safeTransport.stops || safeTransport.stops.length === 0) {
+        console.warn("No stops available in transport data");
+        setFilteredStops([]);
+        return;
+      }
 
+      // Try to find exact matches first
+      let fromIndex = safeTransport.stops.findIndex(stop => 
+        stop.name === fromLocation || stop.stops_name === fromLocation
+      );
+      let toIndex = safeTransport.stops.findIndex(stop => 
+        stop.name === toLocation || stop.stops_name === toLocation
+      );
+
+      // If exact matches not found, try partial matches
+      if (fromIndex === -1) {
+        fromIndex = safeTransport.stops.findIndex(stop => 
+          (stop.name && stop.name.toLowerCase().includes(fromLocation.toLowerCase())) ||
+          (stop.stops_name && stop.stops_name.toLowerCase().includes(fromLocation.toLowerCase()))
+        );
+      }
+      
+      if (toIndex === -1) {
+        toIndex = safeTransport.stops.findIndex(stop => 
+          (stop.name && stop.name.toLowerCase().includes(toLocation.toLowerCase())) ||
+          (stop.stops_name && stop.stops_name.toLowerCase().includes(toLocation.toLowerCase()))
+        );
+      }
+
+      // If still no matches found, show all stops for debugging
       if (fromIndex === -1 || toIndex === -1) {
-        console.warn("From or To location not found in stops list.");
+        console.warn("From or To location not found in stops list.", {
+          fromLocation,
+          toLocation,
+          availableStops: safeTransport.stops.map(stop => stop.name || stop.stops_name)
+        });
+        // Show all stops so user can see what's available
         setFilteredStops(safeTransport.stops);
         return;
       }
 
+      // Ensure we get the correct direction (from start to end)
       const startIndex = Math.min(fromIndex, toIndex);
       const endIndex = Math.max(fromIndex, toIndex);
 
       const slicedStops = safeTransport.stops.slice(startIndex, endIndex + 1);
+      console.log("Filtered stops:", slicedStops.length, "out of", safeTransport.stops.length);
       setFilteredStops(slicedStops);
     }
   }, [safeTransport, fromLocation, toLocation]);

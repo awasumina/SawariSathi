@@ -211,7 +211,7 @@ const TransportCard = React.memo(({ item, navigation, fromLocation, toLocation }
             <View style={styles.detailRow}>
               <MaterialCommunityIcons name="clock-outline" size={16} color={colors.secondaryText} />
               <Text style={styles.detailLabel}>Timing:</Text>
-              <Text style={styles.detailValue} numberOfLines={1}>{estimatedTime || 'N/A'}</Text>
+              <Text style={styles.detailValue} numberOfLines={1}>{estimatedTime || '6:00am - 7:00pm'}</Text>
             </View>
 
             <View style={styles.detailRow}>
