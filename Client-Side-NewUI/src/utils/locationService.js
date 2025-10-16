@@ -154,7 +154,7 @@ export class LocationService {
 
       // Case 1: From input is "My Location" or similar and we have user location
       if (this.isCurrentLocationInput(fromInput) && userLocation) {
-        console.log('Location-based search detected');
+        console.log('Location-based search detected (GPS)');
         
         // Find the destination stop
         const destinationStop = allStops.find(
@@ -172,7 +172,63 @@ export class LocationService {
         }
       }
 
-      // Case 2: Both inputs are location names (traditional search)
+      // Case 2: From input contains coordinates (pasted lat/lng)
+      const fromCoords = this.parseCoordinateInput(fromInput);
+      if (fromCoords) {
+        console.log('Coordinate-based search detected (pasted coordinates)');
+        
+        // Check if destination is also coordinates
+        const toCoords = this.parseCoordinateInput(toInput);
+        if (toCoords) {
+          // Both are coordinates - location to location search
+          return await this.getRoutesBetweenLocations(
+            fromCoords.latitude,
+            fromCoords.longitude,
+            toCoords.latitude,
+            toCoords.longitude
+          );
+        } else {
+          // From is coordinates, to is stop name
+          const destinationStop = allStops.find(
+            stop => stop.stops_name.toLowerCase() === toInput.toLowerCase()
+          );
+          
+          if (destinationStop) {
+            return await this.getRoutesFromCurrentLocation(
+              fromCoords.latitude,
+              fromCoords.longitude,
+              destinationStop.id
+            );
+          } else {
+            throw new Error(`Destination stop "${toInput}" not found`);
+          }
+        }
+      }
+
+      // Case 3: To input contains coordinates
+      const toCoords = this.parseCoordinateInput(toInput);
+      if (toCoords) {
+        console.log('Destination coordinate search detected');
+        
+        // From should be a stop name
+        const fromStop = allStops.find(stop => 
+          stop.stops_name.toLowerCase() === fromInput.toLowerCase()
+        );
+        
+        if (fromStop) {
+          // From stop to coordinates
+          return await this.getRoutesBetweenLocations(
+            parseFloat(fromStop.lat),
+            parseFloat(fromStop.lon),
+            toCoords.latitude,
+            toCoords.longitude
+          );
+        } else {
+          throw new Error(`Source stop "${fromInput}" not found`);
+        }
+      }
+
+      // Case 4: Both inputs are location names (traditional search)
       const fromStop = allStops.find(stop => 
         stop.stops_name.toLowerCase() === fromInput.toLowerCase()
       );
@@ -192,7 +248,14 @@ export class LocationService {
         return response.data;
       }
       
-      throw new Error('Unable to find matching stops for the provided inputs');
+      // If we get here, provide helpful error message
+      let errorMessage = 'Unable to find matching stops for the provided inputs.';
+      
+      if (this.looksLikeCoordinates(fromInput) || this.looksLikeCoordinates(toInput)) {
+        errorMessage += ' If you\'re entering coordinates, make sure they\'re in format: "latitude, longitude" (e.g., "27.7172, 85.3240")';
+      }
+      
+      throw new Error(errorMessage);
       
     } catch (error) {
       console.error('Error in smart route search:', error);
@@ -216,6 +279,65 @@ export class LocationService {
     return currentLocationKeywords.some(keyword => 
       input.toLowerCase().includes(keyword)
     );
+  }
+
+  // Helper method to parse coordinate input (latitude, longitude)
+  static parseCoordinateInput(input) {
+    if (!input || typeof input !== 'string') return null;
+    
+    // Remove extra spaces and normalize
+    const cleaned = input.trim();
+    
+    // Common coordinate patterns:
+    // "27.7172, 85.3240"
+    // "27.7172,85.3240" 
+    // "27.7172 85.3240"
+    // "lat: 27.7172, lng: 85.3240"
+    // "27.7172°N, 85.3240°E"
+    
+    const patterns = [
+      // Simple comma-separated: "27.7172, 85.3240"
+      /^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/,
+      // Space-separated: "27.7172 85.3240"
+      /^(-?\d+\.?\d*)\s+(-?\d+\.?\d*)$/,
+      // With labels: "lat: 27.7172, lng: 85.3240"
+      /(?:lat|latitude):\s*(-?\d+\.?\d*)\s*,?\s*(?:lng|lon|longitude):\s*(-?\d+\.?\d*)/i,
+      // With degree symbols: "27.7172°N, 85.3240°E" (ignoring N/S/E/W for now)
+      /^(-?\d+\.?\d*)°?[NSns]?\s*,?\s*(-?\d+\.?\d*)°?[EWew]?$/,
+      // Parentheses format: "(27.7172, 85.3240)"
+      /^\((-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\)$/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = cleaned.match(pattern);
+      if (match) {
+        const lat = parseFloat(match[1]);
+        const lng = parseFloat(match[2]);
+        
+        // Validate coordinate ranges
+        if (this.isValidCoordinate(lat, lng)) {
+          return { latitude: lat, longitude: lng };
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  // Helper method to check if input is coordinate-like
+  static looksLikeCoordinates(input) {
+    if (!input || typeof input !== 'string') return false;
+    
+    // Quick check for coordinate patterns
+    const coordinateIndicators = [
+      /\d+\.\d*\s*,\s*\d+\.\d*/,  // "27.7172, 85.3240"
+      /lat|lng|latitude|longitude/i,  // Contains coordinate keywords
+      /°[nsew]/i,  // Degree symbols with directions
+      /^\(.*,.*\)$/,  // Parentheses format
+      /^-?\d+\.?\d*\s+\d+\.?\d*$/  // Space-separated numbers
+    ];
+    
+    return coordinateIndicators.some(pattern => pattern.test(input.trim()));
   }
 
   // Calculate walking time based on distance (assumes 5 km/h walking speed)

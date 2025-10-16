@@ -245,156 +245,105 @@ const SearchScreen = ({ navigation, route }) => {
 
         setLoading(true);
         try {
-            // Handle location-based search
-            if (useCurrentLocation && userLocation && LocationService.isCurrentLocationInput(fromLocation)) {
-                const toStop = locations.find(stop => stop.name === toLocation);
-                
-                if (!toStop) {
-                    alert('Destination not found in our database.');
-                    setLoading(false);
-                    return;
-                }
+            // Use the enhanced smart route search that handles all cases
+            const routeData = await LocationService.smartRouteSearch(
+                fromLocation,
+                toLocation,
+                userLocation,
+                locations
+            );
 
-                // Use location-based search
-                const locationRouteData = await LocationService.getRoutesFromCurrentLocation(
-                    userLocation.latitude,
-                    userLocation.longitude,
-                    toStop.id,
-                    2 // 2km radius
-                );
-
-                if (locationRouteData.data && locationRouteData.data.length > 0) {
-                    // Transform location-based results to match expected format
-                    const transformedResults = locationRouteData.data.map(route => {
-                        const transformed = transformRouteData(route, 'location', toStop.id);
-                        
-                        // Add walking information
-                        if (route.walkingToStop) {
-                            transformed.walkingToStop = route.walkingToStop;
-                            transformed.totalJourneyTime = route.totalJourneyTime;
-                        }
-                        
-                        return transformed;
-                    });
-
-                    // Save search and navigate
-                    const newSearch = { 
-                        from: 'My Location', 
-                        to: toLocation, 
-                        timestamp: Date.now(),
-                        isLocationBased: true 
-                    };
-                    const updatedRecents = [newSearch, ...recentSearches.filter(s => 
-                        !(s.from === newSearch.from && s.to === newSearch.to)
-                    )].slice(0, MAX_RECENT_SEARCHES);
-
-                    setRecentSearches(updatedRecents);
-                    await storeData(RECENT_SEARCHES_KEY, updatedRecents);
-
-                    navigation.navigate('SearchResults', {
-                        results: transformedResults,
-                        fromLocation: 'My Location',
-                        toLocation,
-                        isLocationBased: true,
-                        userLocation,
-                        nearbyStops: locationRouteData.nearbyStops
-                    });
-                } else {
-                    alert('No transport options found from your location to this destination.');
-                }
-                
-                setLoading(false);
-                return;
-            }
-
-            // Traditional stop-to-stop search
-            const fromStop = locations.find(stop => stop.name === fromLocation);
-            const toStop = locations.find(stop => stop.name === toLocation);
-
-            if (!fromStop || !toStop) {
-                alert('One or both locations not found in our database.');
-                setLoading(false);
-                return;
-            }
-
-            let allTransportOptions = [];
-
-            try {
-                const response = await axios.get(
-                    `${API_BASE_URL}/routes/stops?stop1=${fromStop.id}&stop2=${toStop.id}`
-                );
-
-                if (response.data?.data) {
-                    response.data.data.forEach(routeData => {
-                        // Process both direct routes and multi-leg journeys
-                        if (routeData.transferCount > 0 && routeData.segments) {
-                            // This is a multi-leg journey - use processMultiLegJourney
-                            processMultiLegJourney(routeData, fromStop.id, toStop.id, allTransportOptions);
-                        } else if (routeData.segments && routeData.segments.length > 0) {
-                            // This is a direct route
-                            const firstSegment = routeData.segments[0];
-
-                            if (firstSegment.vehicles && firstSegment.vehicles.length > 0) {
-                                firstSegment.vehicles.forEach(vehicle => {
-                                    const routeDetail = {
-                                        ...firstSegment,
-                                        route_no: routeData.route_no || firstSegment.route_no,
-                                        route_name: routeData.route_name || firstSegment.route_name,
-                                        vehicleType: vehicle.vehicleType,
-                                        yatayatName: vehicle.yatayatName,
-                                        vehicle_timing: vehicle.vehicle_timing,
-                                        fare: vehicle.fare,
-                                        yatayat_id: vehicle.yatayat_id
-                                    };
-
-                                    allTransportOptions.push(transformRouteData(
-                                        routeDetail,
-                                        fromStop.id,
-                                        toStop.id
-                                    ));
-                                });
-                            } else {
-                                allTransportOptions.push(transformRouteData(
-                                    firstSegment,
-                                    fromStop.id,
-                                    toStop.id
-                                ));
-                            }
-                        }
-                    });
-                }
-            } catch (error) {
-                console.error('Error fetching routes:', error);
-            }
-
-            if (allTransportOptions.length === 0) {
-                alert('No transport options found for this route.');
-            } else {
-                // Sort options
-                allTransportOptions.sort((a, b) => {
-                    if (!a.isMultiLeg && b.isMultiLeg) return -1;
-                    if (a.isMultiLeg && !b.isMultiLeg) return 1;
-                    if (a.combinedFare < b.combinedFare) return -1;
-                    if (a.combinedFare > b.combinedFare) return 1;
-                    return parseFloat(a.combinedDistance) - parseFloat(b.combinedDistance);
+            if (routeData && routeData.data && routeData.data.length > 0) {
+                // Transform results to match expected format
+                const transformedResults = routeData.data.map(route => {
+                    // Determine the search type for transformation
+                    let searchType = 'traditional';
+                    let destinationStopId = null;
+                    
+                    // Check if this was a location-based search
+                    if (route.walkingToStop || route.walkingInfo || routeData.userLocation || routeData.nearbyStops) {
+                        searchType = 'location';
+                        // Try to find destination stop ID
+                        const toStop = locations.find(stop => stop.name === toLocation);
+                        destinationStopId = toStop ? toStop.id : null;
+                    }
+                    
+                    const transformed = transformRouteData(route, searchType, destinationStopId);
+                    
+                    // Add location-specific information
+                    if (route.walkingToStop) {
+                        transformed.walkingToStop = route.walkingToStop;
+                        transformed.totalJourneyTime = route.totalJourneyTime;
+                    }
+                    
+                    if (route.walkingInfo) {
+                        transformed.walkingInfo = route.walkingInfo;
+                        transformed.totalJourneyTime = route.totalJourneyTime;
+                    }
+                    
+                    return transformed;
                 });
 
-                // Save search and navigate
-                const newSearch = { from: fromLocation, to: toLocation, timestamp: Date.now() };
-                const updatedRecents = [newSearch, ...recentSearches.filter(s => !(s.from === newSearch.from && s.to === newSearch.to))].slice(0, MAX_RECENT_SEARCHES);
+                // Determine display names for the search
+                let fromDisplayName = fromLocation;
+                let toDisplayName = toLocation;
+                let isLocationBased = false;
+
+                // Check if we used coordinates or location
+                if (LocationService.isCurrentLocationInput(fromLocation) || 
+                    LocationService.parseCoordinateInput(fromLocation)) {
+                    fromDisplayName = LocationService.parseCoordinateInput(fromLocation) ? 
+                        'Coordinates' : 'My Location';
+                    isLocationBased = true;
+                }
+                
+                if (LocationService.parseCoordinateInput(toLocation)) {
+                    toDisplayName = 'Coordinates';
+                    isLocationBased = true;
+                }
+
+                // Save search to recent searches
+                const newSearch = { 
+                    from: fromDisplayName, 
+                    to: toDisplayName, 
+                    timestamp: Date.now(),
+                    isLocationBased 
+                };
+                const updatedRecents = [newSearch, ...recentSearches.filter(s => 
+                    !(s.from === newSearch.from && s.to === newSearch.to)
+                )].slice(0, MAX_RECENT_SEARCHES);
 
                 setRecentSearches(updatedRecents);
                 await storeData(RECENT_SEARCHES_KEY, updatedRecents);
 
+                // Navigate to results
                 navigation.navigate('SearchResults', {
-                    results: allTransportOptions,
-                    fromLocation,
-                    toLocation
+                    results: transformedResults,
+                    fromLocation: fromDisplayName,
+                    toLocation: toDisplayName,
+                    isLocationBased,
+                    userLocation: routeData.userLocation || userLocation,
+                    nearbyStops: routeData.nearbyStops,
+                    sourceStops: routeData.sourceStops,
+                    destinationStops: routeData.destinationStops
                 });
+            } else {
+                alert('No transport options found for the specified route.');
             }
+            
         } catch (error) {
             console.error('Search error:', error);
-            alert('An error occurred during the search. Please try again.');
+            let errorMessage = 'Failed to find routes. ';
+            
+            if (error.message.includes('coordinates')) {
+                errorMessage += 'Please check your coordinate format (e.g., "27.7172, 85.3240").';
+            } else if (error.message.includes('not found')) {
+                errorMessage += error.message;
+            } else {
+                errorMessage += 'Please try again.';
+            }
+            
+            alert(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -658,7 +607,7 @@ const SearchScreen = ({ navigation, route }) => {
                                         !fromLocation && styles.placeholderText,
                                         useCurrentLocation && styles.locationText
                                     ]} numberOfLines={1}>
-                                        {fromLocation || 'Select departure point'}
+                                        {fromLocation || 'Select departure point or paste coordinates (27.7172, 85.3240)'}
                                     </Text>
                                     {useCurrentLocation && userLocation && (
                                         <Text style={styles.coordinatesText} numberOfLines={1}>
@@ -684,11 +633,25 @@ const SearchScreen = ({ navigation, route }) => {
                                     <Ionicons name="location" size={16} color={toLocation ? colors.background : colors.secondaryText} />
                                 </View>
                                 <Text style={[styles.inputText, !toLocation && styles.placeholderText]} numberOfLines={1}>
-                                    {toLocation || 'Select destination'}
+                                    {toLocation || 'Select destination or paste coordinates (27.6710, 85.4298)'}
                                 </Text>
                             </TouchableOpacity>
                         </View>
                     </View>
+                    
+                    {/* Coordinate Info Text */}
+                    <View style={styles.infoContainer}>
+                        <MaterialCommunityIcons 
+                            name="information-outline" 
+                            size={14} 
+                            color={colors.secondaryText} 
+                            style={styles.infoIcon}
+                        />
+                        <Text style={styles.infoText}>
+                            Tip: You can paste coordinates like "27.7172, 85.3240" for precise location search
+                        </Text>
+                    </View>
+                    
                     {/* Search Button */}
                     <TouchableOpacity
                         style={[styles.searchButton, (!fromLocation || !toLocation || loading) && styles.searchButtonDisabled]}
@@ -1073,6 +1036,26 @@ const styles = StyleSheet.create({
         fontSize: fontSizes.xs,
         color: colors.secondaryText,
         marginTop: 2,
+    },
+    infoContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.xs,
+        marginBottom: spacing.sm,
+        backgroundColor: `${colors.primary}05`,
+        borderRadius: borderRadius.sm,
+        borderWidth: 1,
+        borderColor: `${colors.primary}20`,
+    },
+    infoIcon: {
+        marginRight: spacing.xs,
+    },
+    infoText: {
+        flex: 1,
+        fontSize: fontSizes.xs,
+        color: colors.secondaryText,
+        lineHeight: 16,
     },
 });
 
