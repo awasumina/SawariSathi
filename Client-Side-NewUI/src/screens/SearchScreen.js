@@ -508,7 +508,7 @@ const SearchScreen = ({ navigation, route }) => {
                             <Ionicons name="search" size={20} color={colors.secondaryText} style={styles.searchIcon} />
                             <TextInput
                                 style={styles.searchInput}
-                                placeholder="Search locations..."
+                                placeholder="Search locations or paste coordinates..."
                                 placeholderTextColor={colors.secondaryText}
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
@@ -516,7 +516,34 @@ const SearchScreen = ({ navigation, route }) => {
                             />
                         </View>
                         <FlatList
-                            data={filteredLocations}
+                            data={(() => {
+                                const specialOptions = [];
+                                
+                                // Add "My Location" option if GPS is available and this is the FROM dropdown
+                                if (userLocation && visible && showFromDropdown) {
+                                    if (!searchQuery || LocationService.isCurrentLocationInput(searchQuery)) {
+                                        specialOptions.push({
+                                            id: 'my-location',
+                                            name: 'My Location',
+                                            isMyLocation: true,
+                                            coordinates: userLocation
+                                        });
+                                    }
+                                }
+                                
+                                // Check if the search query looks like coordinates
+                                const coordinates = LocationService.parseCoordinateInput(searchQuery);
+                                if (coordinates && LocationService.looksLikeCoordinates(searchQuery)) {
+                                    specialOptions.push({
+                                        id: 'coordinates',
+                                        name: searchQuery,
+                                        isCoordinates: true,
+                                        coordinates
+                                    });
+                                }
+                                
+                                return [...specialOptions, ...filteredLocations];
+                            })()}
                             keyExtractor={(item) => item.id.toString()}
                             renderItem={({ item: location }) => (
                                 <TouchableOpacity
@@ -526,17 +553,38 @@ const SearchScreen = ({ navigation, route }) => {
                                 >
                                     <View style={styles.locationInfo}>
                                         <View style={styles.locationIconContainer}>
-                                            <Ionicons name="location-sharp" size={16} color={currentValue === location.name ? colors.background : colors.primary} />
+                                            <Ionicons 
+                                                name={location.isMyLocation ? "navigate-circle" : location.isCoordinates ? "navigate" : "location-sharp"} 
+                                                size={16} 
+                                                color={currentValue === location.name ? colors.background : colors.primary} 
+                                            />
                                         </View>
-                                        <Text style={[styles.locationName, currentValue === location.name && styles.selectedText]}>
-                                            {location.name}
-                                        </Text>
+                                        <View style={styles.locationTextContainer}>
+                                            <Text style={[styles.locationName, currentValue === location.name && styles.selectedText]}>
+                                                {location.isMyLocation ? 'My Location' : 
+                                                 location.isCoordinates ? 'Use Coordinates' : location.name}
+                                            </Text>
+                                            {(location.isCoordinates || location.isMyLocation) && location.coordinates && (
+                                                <Text style={styles.coordinateSubtext}>
+                                                    {location.coordinates.latitude.toFixed(4)}, {location.coordinates.longitude.toFixed(4)}
+                                                </Text>
+                                            )}
+                                        </View>
                                     </View>
                                     {currentValue === location.name && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
                                 </TouchableOpacity>
                             )}
                             style={styles.dropdownList}
-                            ListEmptyComponent={<Text style={styles.noResultsText}>No locations found</Text>}
+                            ListEmptyComponent={
+                                <View style={styles.noResultsContainer}>
+                                    <Text style={styles.noResultsText}>No locations found</Text>
+                                    {LocationService.looksLikeCoordinates(searchQuery) && (
+                                        <Text style={styles.noResultsHint}>
+                                            Tip: Make sure coordinates are in format "latitude, longitude"
+                                        </Text>
+                                    )}
+                                </View>
+                            }
                         />
                     </View>
                 </TouchableOpacity>
@@ -1056,6 +1104,25 @@ const styles = StyleSheet.create({
         fontSize: fontSizes.xs,
         color: colors.secondaryText,
         lineHeight: 16,
+    },
+    locationTextContainer: {
+        flex: 1,
+    },
+    coordinateSubtext: {
+        fontSize: fontSizes.xs,
+        color: colors.secondaryText,
+        marginTop: 2,
+    },
+    noResultsContainer: {
+        padding: spacing.md,
+        alignItems: 'center',
+    },
+    noResultsHint: {
+        fontSize: fontSizes.xs,
+        color: colors.secondaryText,
+        textAlign: 'center',
+        marginTop: spacing.xs,
+        fontStyle: 'italic',
     },
 });
 
