@@ -122,7 +122,7 @@ const VehicleDetails = ({ route, navigation }) => {
       alert("No stop information available to display on the map.");
       return;
     }
-  
+
     // Prepare navigation parameters
     const mapParams = {
       stops: safeTransport.stops,
@@ -134,14 +134,35 @@ const VehicleDetails = ({ route, navigation }) => {
         number: safeTransport.routeNumber,
       }
     };
-  
+
+    // Add walking information if available (from location-based search)
+    if (transport?.walkingInfo) {
+      mapParams.walkingInfo = transport.walkingInfo;
+    }
+
+    // Add origin coordinates if this was a location-based search
+    if (transport?.fromLocation && typeof transport.fromLocation === 'object' && transport.fromLocation.latitude) {
+      mapParams.fromCoordinates = {
+        latitude: transport.fromLocation.latitude,
+        longitude: transport.fromLocation.longitude,
+      };
+    }
+
+    // Add destination coordinates if available
+    if (transport?.toLocation && typeof transport.toLocation === 'object' && transport.toLocation.latitude) {
+      mapParams.toCoordinates = {
+        latitude: transport.toLocation.latitude,
+        longitude: transport.toLocation.longitude,
+      };
+    }
+
     // For multi-leg journeys, add additional parameters
     if (safeTransport.isMultiLeg && safeTransport.secondLeg) {
       mapParams.isMultiLeg = true;
       mapParams.transferStop = safeTransport.transferStop;
       mapParams.secondLegStops = safeTransport.secondLeg.stops || [];
     }
-  
+
     navigation.navigate('MapScreen', mapParams);
   };
 

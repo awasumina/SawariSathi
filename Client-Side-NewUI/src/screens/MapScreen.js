@@ -13,17 +13,19 @@ import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, fontSizes } from '../constants/theme';
 
-const GOOGLE_MAPS_API_KEY = '';
+const GOOGLE_MAPS_API_KEY = 'AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg';
 
 export default function MapScreen({ route, navigation }) {
   const [firstLegCoords, setFirstLegCoords] = useState([]);
   const [secondLegCoords, setSecondLegCoords] = useState([]);
+  const [walkingToStartCoords, setWalkingToStartCoords] = useState([]);
+  const [walkingFromEndCoords, setWalkingFromEndCoords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [mapLayout, setMapLayout] = useState(null);
   const fetchedRef = useRef(false);
   const mapRef = useRef(null);
-  
+
   // Default values in case route.params is undefined
   const stops = route.params?.stops || [];
   const fromLocation = route.params?.fromLocation || 'Starting Point';
@@ -32,6 +34,9 @@ export default function MapScreen({ route, navigation }) {
   const isMultiLeg = route.params?.isMultiLeg || false;
   const transferStop = route.params?.transferStop || null;
   const secondLegStops = route.params?.secondLegStops || [];
+  const walkingInfo = route.params?.walkingInfo || null;
+  const fromCoordinates = route.params?.fromCoordinates || null;
+  const toCoordinates = route.params?.toCoordinates || null;
   
   // Convert received stops to proper format
   const convertedStops = stops.map((stop) => ({
@@ -70,18 +75,42 @@ export default function MapScreen({ route, navigation }) {
     const getRoutes = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
-        // For first leg
+        // Fetch walking path from origin to first bus stop if coordinates provided
+        if (fromCoordinates && convertedStops.length > 0) {
+          await fetchWalkingRoute(
+            { latitude: fromCoordinates.latitude, longitude: fromCoordinates.longitude },
+            convertedStops[0],
+            setWalkingToStartCoords
+          );
+        }
+
+        // For first leg (bus route)
         if (convertedStops.length >= 2) {
           await fetchRoute(convertedStops, setFirstLegCoords);
         }
-        
-        // For second leg
+
+        // For second leg (if multi-leg journey)
         if (isMultiLeg && convertedSecondLegStops.length >= 2) {
           await fetchRoute(convertedSecondLegStops, setSecondLegCoords);
         }
-        
+
+        // Fetch walking path from last bus stop to destination if coordinates provided
+        if (toCoordinates) {
+          const lastStop = isMultiLeg && convertedSecondLegStops.length > 0
+            ? convertedSecondLegStops[convertedSecondLegStops.length - 1]
+            : convertedStops[convertedStops.length - 1];
+
+          if (lastStop) {
+            await fetchWalkingRoute(
+              lastStop,
+              { latitude: toCoordinates.latitude, longitude: toCoordinates.longitude },
+              setWalkingFromEndCoords
+            );
+          }
+        }
+
         fetchedRef.current = true; // Mark that we've fetched for this route
       } catch (error) {
         console.error('Route fetch error:', error);
@@ -92,7 +121,7 @@ export default function MapScreen({ route, navigation }) {
     };
 
     getRoutes();
-  }, [JSON.stringify(convertedStops), JSON.stringify(convertedSecondLegStops), isMultiLeg]);
+  }, [JSON.stringify(convertedStops), JSON.stringify(convertedSecondLegStops), isMultiLeg, fromCoordinates, toCoordinates]);
 
   // Reset the fetch ref when route params change
   useEffect(() => {
@@ -103,7 +132,7 @@ export default function MapScreen({ route, navigation }) {
 
   const fetchRoute = async (stops, setCoords) => {
     if (stops.length < 2) return;
-    
+
     try {
       const origin = stops[0];
       const destination = stops[stops.length - 1];
@@ -123,6 +152,27 @@ export default function MapScreen({ route, navigation }) {
     } catch (error) {
       console.error('Route fetch error:', error);
       throw error;
+    }
+  };
+
+  const fetchWalkingRoute = async (origin, destination, setCoords) => {
+    if (!origin || !destination) return;
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=walking&key=${GOOGLE_MAPS_API_KEY}`;
+
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.routes && json.routes.length > 0) {
+        const points = decodePolyline(json.routes[0].overview_polyline.points);
+        setCoords(points);
+      } else {
+        console.warn('No walking route found');
+      }
+    } catch (error) {
+      console.error('Walking route fetch error:', error);
+      // Don't throw error for walking routes, just log it
     }
   };
 
@@ -178,19 +228,39 @@ export default function MapScreen({ route, navigation }) {
 
   // Fit map to show all markers
   const fitMapToMarkers = () => {
-    if (mapRef.current && allStops.length > 0 && mapLayout) {
-      mapRef.current.fitToCoordinates(
-        allStops,
-        {
-          edgePadding: {
-            top: 50,
-            right: 50,
-            bottom: 50,
-            left: 50,
-          },
-          animated: true,
-        }
-      );
+    if (mapRef.current && mapLayout) {
+      const coordinatesToFit = [...allStops];
+
+      // Add home/origin coordinates if available
+      if (fromCoordinates) {
+        coordinatesToFit.unshift({
+          latitude: fromCoordinates.latitude,
+          longitude: fromCoordinates.longitude,
+        });
+      }
+
+      // Add destination coordinates if available
+      if (toCoordinates) {
+        coordinatesToFit.push({
+          latitude: toCoordinates.latitude,
+          longitude: toCoordinates.longitude,
+        });
+      }
+
+      if (coordinatesToFit.length > 0) {
+        mapRef.current.fitToCoordinates(
+          coordinatesToFit,
+          {
+            edgePadding: {
+              top: 100,
+              right: 50,
+              bottom: 150,
+              left: 50,
+            },
+            animated: true,
+          }
+        );
+      }
     }
   };
 
@@ -232,11 +302,52 @@ export default function MapScreen({ route, navigation }) {
         initialRegion={initialRegion}
         onMapReady={onMapReady}
       >
+        {/* Home/Origin Marker */}
+        {fromCoordinates && (
+          <Marker
+            coordinate={{
+              latitude: fromCoordinates.latitude,
+              longitude: fromCoordinates.longitude,
+            }}
+            title="Starting Location"
+            description={fromLocation}
+          >
+            <View style={styles.markerContainer}>
+              <MaterialCommunityIcons
+                name="home"
+                size={28}
+                color={colors.success}
+              />
+            </View>
+          </Marker>
+        )}
+
+        {/* Destination/Home Marker */}
+        {toCoordinates && (
+          <Marker
+            coordinate={{
+              latitude: toCoordinates.latitude,
+              longitude: toCoordinates.longitude,
+            }}
+            title="Destination"
+            description={toLocation}
+          >
+            <View style={styles.markerContainer}>
+              <MaterialCommunityIcons
+                name="home-map-marker"
+                size={28}
+                color={colors.danger}
+              />
+            </View>
+          </Marker>
+        )}
+
+        {/* Bus Stop Markers */}
         {allStops.map((stop, i) => {
           const isFirstStop = i === 0;
           const isLastStop = i === allStops.length - 1;
           const isTransferStop = stop.isTransfer;
-          
+
           return (
             <Marker
               key={`stop-${i}-${stop.latitude}-${stop.longitude}`}
@@ -250,15 +361,15 @@ export default function MapScreen({ route, navigation }) {
               <View style={styles.markerContainer}>
                 {isFirstStop ? (
                   <MaterialCommunityIcons
-                    name="flag-variant"
+                    name="bus-stop"
                     size={24}
                     color={colors.primary}
                   />
                 ) : isLastStop ? (
                   <MaterialCommunityIcons
-                    name="flag-checkered"
+                    name="bus-stop"
                     size={24}
-                    color={colors.success}
+                    color={colors.primary}
                   />
                 ) : isTransferStop ? (
                   <MaterialCommunityIcons
@@ -274,21 +385,41 @@ export default function MapScreen({ route, navigation }) {
           );
         })}
 
-        {/* First leg route polyline */}
+        {/* Walking path from home to first bus stop */}
+        {walkingToStartCoords.length > 0 && (
+          <Polyline
+            coordinates={walkingToStartCoords}
+            strokeColor="#FF6B6B"
+            strokeWidth={3}
+            lineDashPattern={[10, 5]}
+          />
+        )}
+
+        {/* First leg bus route polyline */}
         {firstLegCoords.length > 0 && (
           <Polyline
             coordinates={firstLegCoords}
             strokeColor={colors.primary}
-            strokeWidth={4}
+            strokeWidth={5}
           />
         )}
 
-        {/* Second leg route polyline with different color */}
+        {/* Second leg bus route polyline with different color */}
         {secondLegCoords.length > 0 && isMultiLeg && (
           <Polyline
             coordinates={secondLegCoords}
             strokeColor={colors.accent}
-            strokeWidth={4}
+            strokeWidth={5}
+          />
+        )}
+
+        {/* Walking path from last bus stop to destination */}
+        {walkingFromEndCoords.length > 0 && (
+          <Polyline
+            coordinates={walkingFromEndCoords}
+            strokeColor="#FF6B6B"
+            strokeWidth={3}
+            lineDashPattern={[10, 5]}
           />
         )}
       </MapView>
@@ -329,15 +460,26 @@ export default function MapScreen({ route, navigation }) {
 
       {allStops.length > 0 && (
         <View style={styles.legend}>
+          {fromCoordinates && (
+            <View style={styles.legendItem}>
+              <MaterialCommunityIcons
+                name="home"
+                size={16}
+                color={colors.success}
+              />
+              <Text style={styles.legendText}>Home</Text>
+            </View>
+          )}
+
           <View style={styles.legendItem}>
             <MaterialCommunityIcons
-              name="flag-variant"
+              name="bus-stop"
               size={16}
               color={colors.primary}
             />
-            <Text style={styles.legendText}>Start</Text>
+            <Text style={styles.legendText}>Bus Stop</Text>
           </View>
-          
+
           {isMultiLeg && (
             <View style={styles.legendItem}>
               <MaterialCommunityIcons
@@ -348,39 +490,46 @@ export default function MapScreen({ route, navigation }) {
               <Text style={styles.legendText}>Transfer</Text>
             </View>
           )}
-          
-          <View style={styles.legendItem}>
-            <MaterialCommunityIcons
-              name="flag-checkered"
-              size={16}
-              color={colors.success}
-            />
-            <Text style={styles.legendText}>End</Text>
-          </View>
-          
-          <View style={styles.legendItem}>
-            <View style={[styles.stopMarker, { width: 10, height: 10 }]} />
-            <Text style={styles.legendText}>Stop</Text>
-          </View>
+
+          {toCoordinates && (
+            <View style={styles.legendItem}>
+              <MaterialCommunityIcons
+                name="home-map-marker"
+                size={16}
+                color={colors.danger}
+              />
+              <Text style={styles.legendText}>Destination</Text>
+            </View>
+          )}
         </View>
       )}
 
-      {isMultiLeg && (
-        <View style={styles.routeLegend}>
+      <View style={styles.routeLegend}>
+        {(walkingToStartCoords.length > 0 || walkingFromEndCoords.length > 0) && (
           <View style={styles.legendItem}>
             <View style={styles.lineExample}>
-              <View style={[styles.lineColor, { backgroundColor: colors.primary }]} />
+              <View style={[styles.lineColor, { backgroundColor: '#FF6B6B' }]} />
             </View>
-            <Text style={styles.legendText}>First Route</Text>
+            <Text style={styles.legendText}>Walking</Text>
           </View>
+        )}
+
+        <View style={styles.legendItem}>
+          <View style={styles.lineExample}>
+            <View style={[styles.lineColor, { backgroundColor: colors.primary }]} />
+          </View>
+          <Text style={styles.legendText}>{isMultiLeg ? 'First Bus' : 'Bus Route'}</Text>
+        </View>
+
+        {isMultiLeg && (
           <View style={styles.legendItem}>
             <View style={styles.lineExample}>
               <View style={[styles.lineColor, { backgroundColor: colors.accent }]} />
             </View>
-            <Text style={styles.legendText}>Second Route</Text>
+            <Text style={styles.legendText}>Second Bus</Text>
           </View>
-        </View>
-      )}
+        )}
+      </View>
 
       <TouchableOpacity
         style={styles.fitToMarkersButton}

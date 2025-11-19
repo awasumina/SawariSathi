@@ -189,8 +189,11 @@ export const getRoutesBetweenLocations = async (req, res) => {
                   }
                 }
               };
-              route.totalJourneyTime = 
-                route.walkingInfo.toSourceStop.estimatedTime + 
+              // Add origin and destination coordinates for map display
+              route.fromLocation = { latitude: parseFloat(fromLat), longitude: parseFloat(fromLng) };
+              route.toLocation = { latitude: parseFloat(toLat), longitude: parseFloat(toLng) };
+              route.totalJourneyTime =
+                route.walkingInfo.toSourceStop.estimatedTime +
                 (route.estimatedTime || 30) +
                 route.walkingInfo.fromDestStop.estimatedTime;
             });
@@ -312,6 +315,8 @@ export const getRoutesFromLocation = async (req, res) => {
                 longitude: parseFloat(nearbyStop.stops_lon)
               }
             };
+            // Add origin coordinates for map display
+            route.fromLocation = { latitude: userLat, longitude: userLon };
             route.totalJourneyTime = route.walkingToStop.estimatedTime + (route.estimatedTime || 30);
           });
           
