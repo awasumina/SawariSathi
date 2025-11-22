@@ -826,12 +826,28 @@ async function getDirectRouteDetails(routeId, stop1, stop2, routeInfo) {
    })) || [];
 
 
+   // Use the first vehicle for the main route display (frontend expects this format)
+   const primaryVehicle = vehicleDetails[0] || {
+     yatayat_id: null,
+     vehicle_timing: 'N/A',
+     vehicleType: 'bus',
+     yatayatName: 'Unknown Operator',
+     fare: null
+   };
+
    return {
      routeId,
      route_no: routeData.route_no,
      route_name: routeData.route_name,
      isSingleRoute: true,
      transferCount: 0,
+     // Add flattened properties for frontend compatibility
+     yatayat_id: primaryVehicle.yatayat_id,
+     vehicle_timing: primaryVehicle.vehicle_timing,
+     vehicleType: primaryVehicle.vehicleType,
+     yatayatName: primaryVehicle.yatayatName,
+     fare: primaryVehicle.fare,
+     stops: journeyStops,
      segments: [{
        routeId,
        route_no: routeData.route_no,
