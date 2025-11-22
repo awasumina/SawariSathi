@@ -15,8 +15,7 @@ import { colors, spacing, fontSizes } from '../constants/theme';
 import { API_BASE_URL } from '../config/api';
 
 export default function MapScreen({ route, navigation }) {
-  const [firstLegCoords, setFirstLegCoords] = useState([]);
-  const [secondLegCoords, setSecondLegCoords] = useState([]);
+  const [routeSegments, setRouteSegments] = useState([]); // Array of {coords, color} objects
   const [walkingToStartCoords, setWalkingToStartCoords] = useState([]);
   const [walkingFromEndCoords, setWalkingFromEndCoords] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -24,6 +23,16 @@ export default function MapScreen({ route, navigation }) {
   const [mapLayout, setMapLayout] = useState(null);
   const fetchedRef = useRef(false);
   const mapRef = useRef(null);
+
+  // Define colors for different route segments
+  const segmentColors = [
+    '#4CAF50', // Green
+    '#FF9800', // Orange
+    '#2196F3', // Blue
+    '#E91E63', // Pink
+    '#9C27B0', // Purple
+    '#00BCD4', // Cyan
+  ];
 
   // Default values in case route.params is undefined
   const stops = route.params?.stops || [];
@@ -51,23 +60,64 @@ export default function MapScreen({ route, navigation }) {
     latitude: parseFloat(stop.lat || stop.stops_lat || 0),
     longitude: parseFloat(stop.lon || stop.stops_lon || 0),
     name: stop.name || stop.stops_name || 'Stop',
-    isTransfer: transferStop ? 
+    isTransfer: transferStop ?
       (stop.name === transferStop.stops_name || stop.stops_name === transferStop.stops_name) : false
   }));
 
   // Combine both legs for visualization
-  const allStops = isMultiLeg ? 
-    [...convertedStops, ...convertedSecondLegStops.filter(stop => 
+  const allStops = isMultiLeg ?
+    [...convertedStops, ...convertedSecondLegStops.filter(stop =>
       !convertedStops.some(s => s.latitude === stop.latitude && s.longitude === stop.longitude)
-    )] : 
+    )] :
     convertedStops;
 
   // Find transfer stop if it exists
   const transferStopCoord = allStops.find(stop => stop.isTransfer);
 
+  // Function to detect duplicate stops and split into segments
+  const splitIntoSegments = (stops) => {
+    if (stops.length < 2) return [];
+
+    const segments = [];
+    let currentSegment = [stops[0]];
+
+    for (let i = 1; i < stops.length; i++) {
+      currentSegment.push(stops[i]);
+
+      // Check if current stop is duplicate (appears again later or was seen before)
+      const isDuplicate = stops.slice(i + 1).some(
+        s => s.name === stops[i].name &&
+             s.latitude === stops[i].latitude &&
+             s.longitude === stops[i].longitude
+      );
+
+      // If duplicate found or this is the last stop, save the segment
+      if (isDuplicate || i === stops.length - 1) {
+        if (currentSegment.length >= 2) {
+          segments.push([...currentSegment]);
+        }
+
+        // Start new segment from the duplicate stop (transfer point)
+        if (isDuplicate && i < stops.length - 1) {
+          currentSegment = [stops[i]]; // Include duplicate as start of next segment
+        }
+      }
+    }
+
+    return segments;
+  };
+
+  console.log('🔍 All Stops:', allStops.map(s => s.name));
+  const stopsSegments = splitIntoSegments(allStops);
+  console.log('📍 Detected Segments:', stopsSegments.map((seg, i) => ({
+    segment: i + 1,
+    stops: seg.map(s => s.name),
+    color: segmentColors[i % segmentColors.length]
+  })));
+
   useEffect(() => {
     // Prevent multiple fetches for the same route
-    if ((convertedStops.length < 2 && !isMultiLeg) || fetchedRef.current) {
+    if (allStops.length < 2 || fetchedRef.current) {
       return;
     }
 
@@ -77,29 +127,38 @@ export default function MapScreen({ route, navigation }) {
 
       try {
         // Fetch walking path from origin to first bus stop if coordinates provided
-        if (fromCoordinates && convertedStops.length > 0) {
+        if (fromCoordinates && allStops.length > 0) {
           await fetchWalkingRoute(
             { latitude: fromCoordinates.latitude, longitude: fromCoordinates.longitude },
-            convertedStops[0],
+            allStops[0],
             setWalkingToStartCoords
           );
         }
 
-        // For first leg (bus route)
-        if (convertedStops.length >= 2) {
-          await fetchRoute(convertedStops, setFirstLegCoords);
-        }
+        // Fetch routes for each segment with different colors
+        if (stopsSegments.length > 0) {
+          const segmentsData = [];
 
-        // For second leg (if multi-leg journey)
-        if (isMultiLeg && convertedSecondLegStops.length >= 2) {
-          await fetchRoute(convertedSecondLegStops, setSecondLegCoords);
+          for (let i = 0; i < stopsSegments.length; i++) {
+            const segment = stopsSegments[i];
+            const color = segmentColors[i % segmentColors.length];
+
+            console.log(`🚌 Fetching segment ${i + 1}/${stopsSegments.length}:`, segment.map(s => s.name).join(' → '));
+
+            const coords = await fetchRouteForSegment(segment);
+            if (coords && coords.length > 0) {
+              segmentsData.push({ coords, color });
+              console.log(`✅ Segment ${i + 1} fetched: ${coords.length} points, color: ${color}`);
+            }
+          }
+
+          setRouteSegments(segmentsData);
+          console.log(`📊 Total segments displayed: ${segmentsData.length}`);
         }
 
         // Fetch walking path from last bus stop to destination if coordinates provided
-        if (toCoordinates) {
-          const lastStop = isMultiLeg && convertedSecondLegStops.length > 0
-            ? convertedSecondLegStops[convertedSecondLegStops.length - 1]
-            : convertedStops[convertedStops.length - 1];
+        if (toCoordinates && allStops.length > 0) {
+          const lastStop = allStops[allStops.length - 1];
 
           if (lastStop) {
             await fetchWalkingRoute(
@@ -120,7 +179,7 @@ export default function MapScreen({ route, navigation }) {
     };
 
     getRoutes();
-  }, [JSON.stringify(convertedStops), JSON.stringify(convertedSecondLegStops), isMultiLeg, fromCoordinates, toCoordinates]);
+  }, [JSON.stringify(allStops)]);
 
   // Reset the fetch ref when route params change
   useEffect(() => {
@@ -129,8 +188,8 @@ export default function MapScreen({ route, navigation }) {
     };
   }, [route.params]);
 
-  const fetchRoute = async (stops, setCoords) => {
-    if (stops.length < 2) return;
+  const fetchRouteForSegment = async (stops) => {
+    if (stops.length < 2) return [];
 
     try {
       const origin = stops[0];
@@ -140,22 +199,19 @@ export default function MapScreen({ route, navigation }) {
       // Use backend proxy instead of calling Google API directly
       const url = `${API_BASE_URL}/routes/driving-directions?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&waypoints=${waypoints}`;
 
-      console.log('Fetching driving route from backend:', url);
-
       const res = await fetch(url);
       const json = await res.json();
 
       if (json.polyline) {
         const points = decodePolyline(json.polyline);
-        setCoords(points);
-        console.log(`Driving route decoded: ${points.length} points`);
+        return points;
       } else {
-        console.error('No routes found:', json);
-        setError('No route found');
+        console.error('No routes found for segment:', json);
+        return [];
       }
     } catch (error) {
       console.error('Route fetch error:', error);
-      throw error;
+      return [];
     }
   };
 
@@ -353,7 +409,14 @@ export default function MapScreen({ route, navigation }) {
         {allStops.map((stop, i) => {
           const isFirstStop = i === 0;
           const isLastStop = i === allStops.length - 1;
-          const isTransferStop = stop.isTransfer;
+
+          // Check if this stop is a transfer point (appears multiple times)
+          const occurrences = allStops.filter(
+            s => s.name === stop.name &&
+                 s.latitude === stop.latitude &&
+                 s.longitude === stop.longitude
+          ).length;
+          const isTransferStop = occurrences > 1 || stop.isTransfer;
 
           return (
             <Marker
@@ -363,26 +426,26 @@ export default function MapScreen({ route, navigation }) {
                 longitude: stop.longitude,
               }}
               title={stop.name}
-              description={isTransferStop ? 'Transfer Point' : `Stop ${i + 1}`}
+              description={isTransferStop ? '🔄 Transfer Point - Change Bus Here' : `Stop ${i + 1}`}
             >
               <View style={styles.markerContainer}>
                 {isFirstStop ? (
                   <MaterialCommunityIcons
-                    name="bus-stop"
-                    size={24}
-                    color={colors.primary}
+                    name="flag"
+                    size={28}
+                    color="#4CAF50"
                   />
                 ) : isLastStop ? (
                   <MaterialCommunityIcons
-                    name="bus-stop"
-                    size={24}
-                    color={colors.primary}
+                    name="flag-checkered"
+                    size={28}
+                    color="#FF5722"
                   />
                 ) : isTransferStop ? (
                   <MaterialCommunityIcons
                     name="transfer"
-                    size={24}
-                    color={colors.accent}
+                    size={28}
+                    color="#FF9800"
                   />
                 ) : (
                   <View style={styles.stopMarker} />
@@ -402,23 +465,15 @@ export default function MapScreen({ route, navigation }) {
           />
         )}
 
-        {/* First leg bus route polyline */}
-        {firstLegCoords.length > 0 && (
+        {/* Render all route segments with different colors */}
+        {routeSegments.map((segment, index) => (
           <Polyline
-            coordinates={firstLegCoords}
-            strokeColor={colors.primary}
+            key={`segment-${index}`}
+            coordinates={segment.coords}
+            strokeColor={segment.color}
             strokeWidth={5}
           />
-        )}
-
-        {/* Second leg bus route polyline with different color */}
-        {secondLegCoords.length > 0 && isMultiLeg && (
-          <Polyline
-            coordinates={secondLegCoords}
-            strokeColor={colors.accent}
-            strokeWidth={5}
-          />
-        )}
+        ))}
 
         {/* Walking path from last bus stop to destination */}
         {walkingFromEndCoords.length > 0 && (
@@ -467,45 +522,28 @@ export default function MapScreen({ route, navigation }) {
 
       {allStops.length > 0 && (
         <View style={styles.legend}>
-          {fromCoordinates && (
+          {walkingToStartCoords.length > 0 && (
             <View style={styles.legendItem}>
-              <MaterialCommunityIcons
-                name="home"
-                size={16}
-                color={colors.success}
-              />
-              <Text style={styles.legendText}>Home</Text>
+              <View style={[styles.legendLine, { backgroundColor: '#FF6B6B', borderStyle: 'dashed' }]} />
+              <Text style={styles.legendText}>Walking</Text>
             </View>
           )}
 
-          <View style={styles.legendItem}>
-            <MaterialCommunityIcons
-              name="bus-stop"
-              size={16}
-              color={colors.primary}
-            />
-            <Text style={styles.legendText}>Bus Stop</Text>
-          </View>
+          {routeSegments.map((segment, index) => (
+            <View key={`legend-${index}`} style={styles.legendItem}>
+              <View style={[styles.legendLine, { backgroundColor: segment.color }]} />
+              <Text style={styles.legendText}>Bus {index + 1}</Text>
+            </View>
+          ))}
 
-          {isMultiLeg && (
+          {stopsSegments.length > 1 && (
             <View style={styles.legendItem}>
               <MaterialCommunityIcons
                 name="transfer"
                 size={16}
-                color={colors.accent}
+                color="#FF9800"
               />
               <Text style={styles.legendText}>Transfer</Text>
-            </View>
-          )}
-
-          {toCoordinates && (
-            <View style={styles.legendItem}>
-              <MaterialCommunityIcons
-                name="home-map-marker"
-                size={16}
-                color={colors.danger}
-              />
-              <Text style={styles.legendText}>Destination</Text>
             </View>
           )}
         </View>
@@ -652,6 +690,11 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     color: colors.primaryText,
     marginLeft: spacing.xs,
+  },
+  legendLine: {
+    width: 20,
+    height: 4,
+    borderRadius: 2,
   },
   lineExample: {
     width: 16,
