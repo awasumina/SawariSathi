@@ -303,6 +303,31 @@ const SearchScreen = ({ navigation, route }) => {
                         walkingToStop: route.walkingToStop
                     });
 
+                    // FIX: If route.stops is missing but segments exist, extract stops from segments
+                    if ((!route.stops || route.stops.length === 0) && route.segments && route.segments.length > 0) {
+                        console.log('⚠️ Stops missing at root level, extracting from segments...');
+
+                        // For multi-leg journeys, combine stops from all segments
+                        if (route.segments.length > 1) {
+                            // Multi-leg: combine all segment stops
+                            route.stops = route.segments.reduce((allStops, segment) => {
+                                if (segment.stops && segment.stops.length > 0) {
+                                    return [...allStops, ...segment.stops];
+                                }
+                                return allStops;
+                            }, []);
+                        } else {
+                            // Single segment: use its stops
+                            route.stops = route.segments[0]?.stops || [];
+                        }
+
+                        console.log('✅ Extracted stops from segments:', {
+                            stopsCount: route.stops.length,
+                            firstStop: route.stops[0]?.stops_name,
+                            lastStop: route.stops[route.stops.length - 1]?.stops_name
+                        });
+                    }
+
                     console.log('Transform route with stops:', {
                         fromStopId,
                         toStopId,

@@ -18,6 +18,6 @@ fetchImageUrl('Vehicle', 'sajha.jpg');
 
 
 
-https://maps.googleapis.com/maps/api/js?key=<key>&libraries=places&language=en
+https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&language=en
 
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao&libraries=places&callback=initMap" 
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places&callback=initMap" 
