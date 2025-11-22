@@ -368,9 +368,30 @@ const SearchScreen = ({ navigation, route }) => {
                         }
                     }
 
+                    // Handle walking from last bus stop to destination
+                    if (route.walkingFromStop) {
+                        transformed.walkingFromStop = route.walkingFromStop;
+                        transformed.totalJourneyTime = route.totalJourneyTime;
+
+                        // Add destination coordinates for map walking path
+                        if (route.toLocation) {
+                            transformed.toLocation = route.toLocation;
+                        }
+                    }
+
                     if (route.walkingInfo) {
                         transformed.walkingInfo = route.walkingInfo;
                         transformed.totalJourneyTime = route.totalJourneyTime;
+                    }
+
+                    // Check if destination is coordinates (for bus stop → coordinates search)
+                    const toCoords = LocationService.parseCoordinateInput(toLocation);
+                    if (toCoords && !transformed.toLocation) {
+                        transformed.toLocation = {
+                            latitude: toCoords.latitude,
+                            longitude: toCoords.longitude
+                        };
+                        console.log('📍 Added destination coordinates:', transformed.toLocation);
                     }
 
                     return transformed;

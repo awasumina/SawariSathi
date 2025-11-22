@@ -154,6 +154,13 @@ const VehicleDetails = ({ route, navigation }) => {
         latitude: transport.toLocation.latitude,
         longitude: transport.toLocation.longitude,
       };
+      console.log('🎯 Destination coordinates added for map:', mapParams.toCoordinates);
+    }
+
+    // Add walking from stop info if available
+    if (transport?.walkingFromStop) {
+      mapParams.walkingFromStop = transport.walkingFromStop;
+      console.log('🚶 Walking from stop info:', transport.walkingFromStop);
     }
 
     // For multi-leg journeys, add additional parameters

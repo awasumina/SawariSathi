@@ -160,6 +160,9 @@ export default function MapScreen({ route, navigation }) {
         if (toCoordinates && allStops.length > 0) {
           const lastStop = allStops[allStops.length - 1];
 
+          console.log('🎯 Destination coordinates detected:', toCoordinates);
+          console.log('🚶 Fetching walking path from last stop to destination...');
+
           if (lastStop) {
             await fetchWalkingRoute(
               lastStop,
@@ -167,6 +170,8 @@ export default function MapScreen({ route, navigation }) {
               setWalkingFromEndCoords
             );
           }
+        } else {
+          console.log('ℹ️ No destination coordinates for walking path:', { toCoordinates, stopsCount: allStops.length });
         }
 
         fetchedRef.current = true; // Mark that we've fetched for this route
