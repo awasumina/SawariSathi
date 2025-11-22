@@ -213,13 +213,23 @@ const VehicleDetails = ({ route, navigation }) => {
   const [secondLegStops, setSecondLegStops] = useState([]);
 
   useEffect(() => {
+    console.log("VehicleDetails - Processing stops:", {
+      totalStops: safeTransport.stops?.length,
+      fromLocation,
+      toLocation,
+      fromStopId: safeTransport.fromStopId,
+      toStopId: safeTransport.toStopId,
+      isMultiLeg: safeTransport.isMultiLeg,
+      stopsData: safeTransport.stops
+    });
+
     if (safeTransport.isMultiLeg && safeTransport.secondLeg) {
       if (safeTransport.stops && safeTransport.stops.length > 0) {
-        const transferStopName = safeTransport.transferStop?.stops_name || 'Transfer Point';
-        const transferStopIndex = safeTransport.stops.findIndex(stop => stop.name === transferStopName);
-        
+        const transferStopId = safeTransport.transferStop?.id;
+        const transferStopIndex = safeTransport.stops.findIndex(stop => stop.id === transferStopId);
+
         if (transferStopIndex !== -1) {
-          const startIndex = safeTransport.stops.findIndex(stop => stop.name === fromLocation);
+          const startIndex = safeTransport.stops.findIndex(stop => stop.id === safeTransport.fromStopId);
           const stopsToTransfer = safeTransport.stops.slice(
             startIndex !== -1 ? startIndex : 0,
             transferStopIndex + 1
@@ -229,49 +239,57 @@ const VehicleDetails = ({ route, navigation }) => {
           setFirstLegStops(safeTransport.stops);
         }
       }
-      
+
       if (safeTransport.secondLeg && safeTransport.secondLeg.stops && safeTransport.secondLeg.stops.length > 0) {
         setSecondLegStops(safeTransport.secondLeg.stops);
       }
     } else {
-      // Enhanced logic for filtering stops between fromLocation and toLocation
+      // Use stop IDs for matching instead of names (fixes coordinate-based search)
       if (!safeTransport.stops || safeTransport.stops.length === 0) {
-        console.warn("No stops available in transport data");
+        console.warn("VehicleDetails - No stops available in transport data");
         setFilteredStops([]);
         return;
       }
 
-      // Try to find exact matches first
-      let fromIndex = safeTransport.stops.findIndex(stop => 
-        stop.name === fromLocation || stop.stops_name === fromLocation
-      );
-      let toIndex = safeTransport.stops.findIndex(stop => 
-        stop.name === toLocation || stop.stops_name === toLocation
-      );
+      console.log("VehicleDetails - Available stops:", safeTransport.stops.map(stop => ({
+        id: stop.id,
+        name: stop.name || stop.stops_name
+      })));
 
-      // If exact matches not found, try partial matches
-      if (fromIndex === -1) {
-        fromIndex = safeTransport.stops.findIndex(stop => 
-          (stop.name && stop.name.toLowerCase().includes(fromLocation.toLowerCase())) ||
-          (stop.stops_name && stop.stops_name.toLowerCase().includes(fromLocation.toLowerCase()))
-        );
-      }
-      
-      if (toIndex === -1) {
-        toIndex = safeTransport.stops.findIndex(stop => 
-          (stop.name && stop.name.toLowerCase().includes(toLocation.toLowerCase())) ||
-          (stop.stops_name && stop.stops_name.toLowerCase().includes(toLocation.toLowerCase()))
-        );
+      // Use stop IDs if available (more reliable than names)
+      let fromIndex = -1;
+      let toIndex = -1;
+
+      if (safeTransport.fromStopId && safeTransport.toStopId) {
+        // Match by stop ID (works for coordinate-based searches)
+        fromIndex = safeTransport.stops.findIndex(stop => stop.id == safeTransport.fromStopId);
+        toIndex = safeTransport.stops.findIndex(stop => stop.id == safeTransport.toStopId);
+        console.log("VehicleDetails - Matched by ID:", { fromIndex, toIndex, fromStopId: safeTransport.fromStopId, toStopId: safeTransport.toStopId });
       }
 
-      // If still no matches found, show all stops for debugging
+      // Fallback to name matching if ID matching failed
       if (fromIndex === -1 || toIndex === -1) {
-        console.warn("From or To location not found in stops list.", {
+        fromIndex = safeTransport.stops.findIndex(stop =>
+          stop.name === fromLocation || stop.stops_name === fromLocation
+        );
+        toIndex = safeTransport.stops.findIndex(stop =>
+          stop.name === toLocation || stop.stops_name === toLocation
+        );
+        console.log("VehicleDetails - Matched by name:", { fromIndex, toIndex, fromLocation, toLocation });
+      }
+
+      // If still no match, show all stops
+      if (fromIndex === -1 || toIndex === -1) {
+        console.warn("VehicleDetails - Could not match stops, showing all stops.", {
           fromLocation,
           toLocation,
-          availableStops: safeTransport.stops.map(stop => stop.name || stop.stops_name)
+          fromStopId: safeTransport.fromStopId,
+          toStopId: safeTransport.toStopId,
+          fromIndex,
+          toIndex,
+          availableStops: safeTransport.stops.map(stop => ({ id: stop.id, name: stop.name || stop.stops_name }))
         });
-        // Show all stops so user can see what's available
+        // Show all stops so user can see the route
         setFilteredStops(safeTransport.stops);
         return;
       }
@@ -281,7 +299,7 @@ const VehicleDetails = ({ route, navigation }) => {
       const endIndex = Math.max(fromIndex, toIndex);
 
       const slicedStops = safeTransport.stops.slice(startIndex, endIndex + 1);
-      console.log("Filtered stops:", slicedStops.length, "out of", safeTransport.stops.length);
+      console.log("VehicleDetails - Filtered stops:", slicedStops.length, "out of", safeTransport.stops.length);
       setFilteredStops(slicedStops);
     }
   }, [safeTransport, fromLocation, toLocation]);
