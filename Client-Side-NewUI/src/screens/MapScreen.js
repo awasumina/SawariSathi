@@ -14,8 +14,6 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, fontSizes } from '../constants/theme';
 import { API_BASE_URL } from '../config/api';
 
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-
 export default function MapScreen({ route, navigation }) {
   const [firstLegCoords, setFirstLegCoords] = useState([]);
   const [secondLegCoords, setSecondLegCoords] = useState([]);
@@ -138,14 +136,19 @@ export default function MapScreen({ route, navigation }) {
       const origin = stops[0];
       const destination = stops[stops.length - 1];
       const waypoints = stops.slice(1, -1).map((p) => `${p.latitude},${p.longitude}`).join('|');
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&waypoints=${waypoints}&key=${GOOGLE_MAPS_API_KEY}`;
+
+      // Use backend proxy instead of calling Google API directly
+      const url = `${API_BASE_URL}/routes/driving-directions?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&waypoints=${waypoints}`;
+
+      console.log('Fetching driving route from backend:', url);
 
       const res = await fetch(url);
       const json = await res.json();
 
-      if (json.routes && json.routes.length > 0) {
-        const points = decodePolyline(json.routes[0].overview_polyline.points);
+      if (json.polyline) {
+        const points = decodePolyline(json.polyline);
         setCoords(points);
+        console.log(`Driving route decoded: ${points.length} points`);
       } else {
         console.error('No routes found:', json);
         setError('No route found');

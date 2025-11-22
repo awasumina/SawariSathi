@@ -10,7 +10,8 @@ import {
   getNearbyStops,
   getRoutesFromLocation,
   getRoutesBetweenLocations,
-  getWalkingDirections
+  getWalkingDirections,
+  getDrivingDirections
 } from '../controllers/routeControllers.js';
  
 import {
@@ -41,6 +42,7 @@ router.get('/routes/nearby-stops', getNearbyStops);
 router.get('/routes/from-location', getRoutesFromLocation);
 router.get('/routes/between-locations', getRoutesBetweenLocations);
 router.get('/routes/walking-directions', getWalkingDirections);
+router.get('/routes/driving-directions', getDrivingDirections);
 
 
 //dashboard

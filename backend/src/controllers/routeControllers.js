@@ -1262,3 +1262,61 @@ export const getWalkingDirections = async (req, res) => {
     res.status(500).json({ error: "Internal server error", message: err.message });
   }
 };
+
+// Get driving directions between multiple points using Google Directions API
+export const getDrivingDirections = async (req, res) => {
+  const { origin, destination, waypoints } = req.query;
+
+  try {
+    // Validate input
+    if (!origin || !destination) {
+      return res.status(400).json({
+        error: "origin and destination are required"
+      });
+    }
+
+    // Build URL with waypoints if provided
+    let url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=driving&key=${GOOGLE_MAPS_API_KEY}`;
+
+    if (waypoints) {
+      url += `&waypoints=${waypoints}`;
+    }
+
+    console.log(`Fetching driving directions from ${origin} to ${destination}${waypoints ? ' with waypoints' : ''}`);
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status !== 'OK') {
+      console.error('Google Directions API error:', data.status, data.error_message);
+      return res.status(400).json({
+        error: 'Failed to fetch directions',
+        status: data.status,
+        message: data.error_message
+      });
+    }
+
+    if (!data.routes || data.routes.length === 0) {
+      return res.json({
+        polyline: null,
+        distance: null,
+        duration: null,
+        message: 'No driving route found'
+      });
+    }
+
+    const route = data.routes[0];
+
+    res.json({
+      polyline: route.overview_polyline.points,
+      bounds: route.bounds,
+      legs: route.legs.map(leg => ({
+        distance: leg.distance,
+        duration: leg.duration
+      }))
+    });
+  } catch (err) {
+    console.error("Error fetching driving directions:", err.message);
+    res.status(500).json({ error: "Internal server error", message: err.message });
+  }
+};
