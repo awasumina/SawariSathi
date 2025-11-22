@@ -294,6 +294,15 @@ const SearchScreen = ({ navigation, route }) => {
                         toStopId = toStop ? toStop.id : null;
                     }
 
+                    console.log('🔍 RAW ROUTE DATA FROM BACKEND:', {
+                        hasStops: !!route.stops,
+                        stopsCount: route.stops?.length,
+                        stopsArray: route.stops,
+                        routeKeys: Object.keys(route),
+                        segments: route.segments,
+                        walkingToStop: route.walkingToStop
+                    });
+
                     console.log('Transform route with stops:', {
                         fromStopId,
                         toStopId,
