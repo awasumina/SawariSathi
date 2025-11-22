@@ -268,31 +268,59 @@ const SearchScreen = ({ navigation, route }) => {
             if (routeData && routeData.data && routeData.data.length > 0) {
                 // Transform results to match expected format
                 const transformedResults = routeData.data.map(route => {
-                    // Determine the search type for transformation
-                    let searchType = 'traditional';
-                    let destinationStopId = null;
-                    
-                    // Check if this was a location-based search
-                    if (route.walkingToStop || route.walkingInfo || routeData.userLocation || routeData.nearbyStops) {
-                        searchType = 'location';
-                        // Try to find destination stop ID
-                        const toStop = locations.find(stop => stop.name === toLocation);
-                        destinationStopId = toStop ? toStop.id : null;
+                    // Determine fromStopId and toStopId based on search type
+                    let fromStopId = null;
+                    let toStopId = null;
+
+                    // For location-based search (coordinates or "My Location")
+                    if (route.walkingToStop) {
+                        // The route starts from the nearest stop found by backend
+                        fromStopId = route.walkingToStop.stopId;
+
+                        // Find destination stop ID
+                        const toStop = locations.find(stop =>
+                            (stop.stops_name || stop.name || '').toLowerCase() === toLocation.toLowerCase()
+                        );
+                        toStopId = toStop ? toStop.id : null;
+                    } else {
+                        // Traditional stop-to-stop search
+                        const fromStop = locations.find(stop =>
+                            (stop.stops_name || stop.name || '').toLowerCase() === fromLocation.toLowerCase()
+                        );
+                        const toStop = locations.find(stop =>
+                            (stop.stops_name || stop.name || '').toLowerCase() === toLocation.toLowerCase()
+                        );
+                        fromStopId = fromStop ? fromStop.id : null;
+                        toStopId = toStop ? toStop.id : null;
                     }
-                    
-                    const transformed = transformRouteData(route, searchType, destinationStopId);
+
+                    console.log('Transform route with stops:', { fromStopId, toStopId, hasWalking: !!route.walkingToStop });
+
+                    const transformed = transformRouteData(
+                        route,
+                        fromStopId,
+                        toStopId,
+                        route.isMultiLeg || false,
+                        route.transferStop || null,
+                        route.secondLeg || null
+                    );
                     
                     // Add location-specific information
                     if (route.walkingToStop) {
                         transformed.walkingToStop = route.walkingToStop;
                         transformed.totalJourneyTime = route.totalJourneyTime;
+
+                        // Add origin coordinates for map walking path
+                        if (route.fromLocation) {
+                            transformed.fromLocation = route.fromLocation;
+                        }
                     }
-                    
+
                     if (route.walkingInfo) {
                         transformed.walkingInfo = route.walkingInfo;
                         transformed.totalJourneyTime = route.totalJourneyTime;
                     }
-                    
+
                     return transformed;
                 });
 
