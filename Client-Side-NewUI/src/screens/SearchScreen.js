@@ -384,7 +384,17 @@ const SearchScreen = ({ navigation, route }) => {
                         transformed.totalJourneyTime = route.totalJourneyTime;
                     }
 
-                    // Check if destination is coordinates (for bus stop → coordinates search)
+                    // Check if origin is coordinates (for coordinates → bus stop/coordinates search)
+                    const fromCoords = LocationService.parseCoordinateInput(fromLocation);
+                    if (fromCoords && !transformed.fromLocation) {
+                        transformed.fromLocation = {
+                            latitude: fromCoords.latitude,
+                            longitude: fromCoords.longitude
+                        };
+                        console.log('🎯 Added origin coordinates:', transformed.fromLocation);
+                    }
+
+                    // Check if destination is coordinates (for bus stop/coordinates → coordinates search)
                     const toCoords = LocationService.parseCoordinateInput(toLocation);
                     if (toCoords && !transformed.toLocation) {
                         transformed.toLocation = {

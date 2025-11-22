@@ -45,6 +45,15 @@ export default function MapScreen({ route, navigation }) {
   const walkingInfo = route.params?.walkingInfo || null;
   const fromCoordinates = route.params?.fromCoordinates || null;
   const toCoordinates = route.params?.toCoordinates || null;
+
+  // Debug: Log what coordinates were received
+  console.log('🗺️ MapScreen received coordinates:', {
+    hasFromCoordinates: !!fromCoordinates,
+    hasToCoordinates: !!toCoordinates,
+    fromCoordinates,
+    toCoordinates,
+    stopsCount: stops.length
+  });
   
   // Convert received stops to proper format
   const convertedStops = stops.map((stop) => ({
@@ -128,11 +137,15 @@ export default function MapScreen({ route, navigation }) {
       try {
         // Fetch walking path from origin to first bus stop if coordinates provided
         if (fromCoordinates && allStops.length > 0) {
+          console.log('🎯 Origin coordinates detected:', fromCoordinates);
+          console.log('🚶 Fetching walking path from origin to first stop...');
           await fetchWalkingRoute(
             { latitude: fromCoordinates.latitude, longitude: fromCoordinates.longitude },
             allStops[0],
             setWalkingToStartCoords
           );
+        } else {
+          console.log('ℹ️ No origin coordinates for walking path:', { fromCoordinates, stopsCount: allStops.length });
         }
 
         // Fetch routes for each segment with different colors
