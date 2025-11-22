@@ -294,7 +294,16 @@ const SearchScreen = ({ navigation, route }) => {
                         toStopId = toStop ? toStop.id : null;
                     }
 
-                    console.log('Transform route with stops:', { fromStopId, toStopId, hasWalking: !!route.walkingToStop });
+                    console.log('Transform route with stops:', {
+                        fromStopId,
+                        toStopId,
+                        hasWalking: !!route.walkingToStop,
+                        walkingToStopId: route.walkingToStop?.stopId,
+                        walkingToStopName: route.walkingToStop?.stopName,
+                        routeStopsCount: route.stops?.length,
+                        firstStop: route.stops?.[0]?.stops_name || route.stops?.[0]?.name,
+                        lastStop: route.stops?.[route.stops.length - 1]?.stops_name || route.stops?.[route.stops.length - 1]?.name
+                    });
 
                     const transformed = transformRouteData(
                         route,
@@ -304,7 +313,16 @@ const SearchScreen = ({ navigation, route }) => {
                         route.transferStop || null,
                         route.secondLeg || null
                     );
-                    
+
+                    console.log('Transformed result:', {
+                        hasStops: !!transformed.stops,
+                        transformedStopsCount: transformed.stops?.length,
+                        fromStopId: transformed.fromStopId,
+                        toStopId: transformed.toStopId,
+                        hasFromLocation: !!transformed.fromLocation,
+                        hasWalkingToStop: !!transformed.walkingToStop
+                    });
+
                     // Add location-specific information
                     if (route.walkingToStop) {
                         transformed.walkingToStop = route.walkingToStop;
