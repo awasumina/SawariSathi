@@ -87,7 +87,7 @@ Example: From "Ratnapark" to "Koteshwor"
 
 2. **Google Maps API Key** ([app.json](Client-Side-NewUI/app.json))
    ```json
-   "apiKey": "AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg"
+   "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
    ```
 
 3. **Backend Running**:

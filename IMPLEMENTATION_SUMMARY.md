@@ -16,7 +16,7 @@ Enable users to see complete journey visualization on Google Maps including:
 **File**: [Client-Side-NewUI/src/screens/MapScreen.js](Client-Side-NewUI/src/screens/MapScreen.js)
 
 **Changes Made:**
-- ✅ Added Google Maps API key (`AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg`)
+- ✅ Added Google Maps API key (`YOUR_GOOGLE_MAPS_API_KEY`)
 - ✅ Added state for walking path coordinates:
   - `walkingToStartCoords` - Path from home to first bus stop
   - `walkingFromEndCoords` - Path from last bus stop to destination

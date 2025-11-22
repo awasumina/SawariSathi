@@ -140,7 +140,7 @@ Location: [app.json:46-48](Client-Side-NewUI/app.json)
 "android": {
   "config": {
     "googleMaps": {
-      "apiKey": "AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg"
+      "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
     }
   }
 }

@@ -11,9 +11,9 @@ This guide explains how to configure environment variables for both frontend and
 
 **Current Configuration:**
 ```env
-SUPABASE_URL=https://harjukgmkopkziyskpso.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-GOOGLE_MAPS=AIzaSyByws6vEMv6x4oUvxmMoA1-gh_V5Y-RYO4
+SUPABASE_URL=your-supabase-url-here
+SUPABASE_KEY=your-supabase-key-here
+GOOGLE_MAPS=your-google-maps-api-key-here
 ```
 
 **Variables:**
@@ -35,7 +35,7 @@ const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS || '';
 
 **Current Configuration:**
 ```env
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key-here
 ```
 
 **Important Notes:**

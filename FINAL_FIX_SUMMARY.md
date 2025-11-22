@@ -14,7 +14,7 @@ You reported:
 
 **Frontend (.env)**:
 ```env
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBq47A6hxDste6PHdpGX31Y6PbPFpraqbI
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 ```
 
 **Frontend (app.json)**:
@@ -22,7 +22,7 @@ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBq47A6hxDste6PHdpGX31Y6PbPFpraqbI
 "android": {
   "config": {
     "googleMaps": {
-      "apiKey": "AIzaSyBq47A6hxDste6PHdpGX31Y6PbPFpraqbI"
+      "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
     }
   }
 }
@@ -30,7 +30,7 @@ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBq47A6hxDste6PHdpGX31Y6PbPFpraqbI
 
 **Backend (.env)**:
 ```env
-GOOGLE_MAPS = AIzaSyBq47A6hxDste6PHdpGX31Y6PbPFpraqbI
+GOOGLE_MAPS = YOUR_GOOGLE_MAPS_API_KEY
 ```
 
 ### 2. Backend - Added Driving Directions Endpoint

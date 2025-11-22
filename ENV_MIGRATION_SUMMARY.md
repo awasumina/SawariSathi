@@ -12,7 +12,7 @@ Moved hardcoded Google Maps API key from code to environment variables for bette
 **File**: [Client-Side-NewUI/.env](Client-Side-NewUI/.env)
 
 ```env
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 ```
 
 ### 2. Updated MapScreen.js
@@ -20,7 +20,7 @@ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg
 
 **Before:**
 ```javascript
-const GOOGLE_MAPS_API_KEY = 'AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg';
+const GOOGLE_MAPS_API_KEY = 'YOUR_GOOGLE_MAPS_API_KEY';
 ```
 
 **After:**
@@ -93,15 +93,15 @@ The `--clear` flag clears the cache and ensures new env vars are loaded.
 ### Backend
 ```env
 # backend/.env
-SUPABASE_URL=https://harjukgmkopkziyskpso.supabase.co
-SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-GOOGLE_MAPS=AIzaSyByws6vEMv6x4oUvxmMoA1-gh_V5Y-RYO4
+SUPABASE_URL=your-supabase-url-here
+SUPABASE_KEY=your-supabase-key-here
+GOOGLE_MAPS=YOUR_GOOGLE_MAPS_API_KEY
 ```
 
 ### Frontend
 ```env
 # Client-Side-NewUI/.env
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 ```
 
 ### Android Native
@@ -111,7 +111,7 @@ EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg
   "android": {
     "config": {
       "googleMaps": {
-        "apiKey": "AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg"
+        "apiKey": "YOUR_GOOGLE_MAPS_API_KEY"
       }
     }
   }

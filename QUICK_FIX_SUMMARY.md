@@ -114,7 +114,7 @@ npx expo start
 
 **Backend `.env` file must have:**
 ```env
-GOOGLE_MAPS=AIzaSyByws6vEMv6x4oUvxmMoA1-gh_V5Y-RYO4
+GOOGLE_MAPS=YOUR_GOOGLE_MAPS_API_KEY
 ```
 
 *(You already have this configured)*
