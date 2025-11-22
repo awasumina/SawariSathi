@@ -2,14 +2,15 @@ import express from 'express';
 // import listEndpoints from 'express-list-endpoints'; // Correct import syntax
 
 import {
-  getFare, 
+  getFare,
   getYatayatId,
   getStopsForRoutes,
   getVehicleImage,
   getAllStops,
   getNearbyStops,
   getRoutesFromLocation,
-  getRoutesBetweenLocations
+  getRoutesBetweenLocations,
+  getWalkingDirections
 } from '../controllers/routeControllers.js';
  
 import {
@@ -39,6 +40,7 @@ router.get('/yatayat/vehicleImage', getVehicleImage);
 router.get('/routes/nearby-stops', getNearbyStops);
 router.get('/routes/from-location', getRoutesFromLocation);
 router.get('/routes/between-locations', getRoutesBetweenLocations);
+router.get('/routes/walking-directions', getWalkingDirections);
 
 
 //dashboard

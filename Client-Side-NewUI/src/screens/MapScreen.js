@@ -12,8 +12,9 @@ import {
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, fontSizes } from '../constants/theme';
+import { API_BASE_URL } from '../config/api';
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyBZcJXrLsY22iUxc4k1i-H2dzpt2B8PtIg';
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 export default function MapScreen({ route, navigation }) {
   const [firstLegCoords, setFirstLegCoords] = useState([]);
@@ -159,16 +160,19 @@ export default function MapScreen({ route, navigation }) {
     if (!origin || !destination) return;
 
     try {
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&mode=walking&key=${GOOGLE_MAPS_API_KEY}`;
+      const url = `${API_BASE_URL}/routes/walking-directions?fromLat=${origin.latitude}&fromLng=${origin.longitude}&toLat=${destination.latitude}&toLng=${destination.longitude}`;
+
+      console.log('Fetching walking route from backend:', url);
 
       const res = await fetch(url);
       const json = await res.json();
 
-      if (json.routes && json.routes.length > 0) {
-        const points = decodePolyline(json.routes[0].overview_polyline.points);
+      if (json.polyline) {
+        const points = decodePolyline(json.polyline);
         setCoords(points);
+        console.log(`Walking route decoded: ${points.length} points`);
       } else {
-        console.warn('No walking route found');
+        console.warn('No walking route found:', json.message);
       }
     } catch (error) {
       console.error('Walking route fetch error:', error);

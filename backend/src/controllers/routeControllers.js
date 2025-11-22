@@ -1,5 +1,7 @@
 import supabase from "../config/supabaseClient.js";
 
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS || '';
+
 // Helper function to calculate distance between two coordinates using Haversine formula
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371; // Earth's radius in kilometers
@@ -1187,4 +1189,60 @@ export const getVehicleImage = async (req, res) => {
    console.error("Error fetching image URL:", err.message);
    res.status(500).json({ error: "Error fetching image URL" });
  }
+};
+
+// Get walking directions between two points using Google Directions API
+export const getWalkingDirections = async (req, res) => {
+  const { fromLat, fromLng, toLat, toLng } = req.query;
+
+  try {
+    // Validate input
+    if (!fromLat || !fromLng || !toLat || !toLng) {
+      return res.status(400).json({
+        error: "fromLat, fromLng, toLat, and toLng are required"
+      });
+    }
+
+    const origin = `${fromLat},${fromLng}`;
+    const destination = `${toLat},${toLng}`;
+    const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin}&destination=${destination}&mode=walking&key=${GOOGLE_MAPS_API_KEY}`;
+
+    console.log(`Fetching walking directions from ${origin} to ${destination}`);
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status !== 'OK') {
+      console.error('Google Directions API error:', data.status, data.error_message);
+      return res.status(400).json({
+        error: 'Failed to fetch directions',
+        status: data.status,
+        message: data.error_message
+      });
+    }
+
+    if (!data.routes || data.routes.length === 0) {
+      return res.json({
+        polyline: null,
+        distance: null,
+        duration: null,
+        message: 'No walking route found'
+      });
+    }
+
+    const route = data.routes[0];
+    const leg = route.legs[0];
+
+    res.json({
+      polyline: route.overview_polyline.points,
+      distance: leg.distance,
+      duration: leg.duration,
+      startAddress: leg.start_address,
+      endAddress: leg.end_address
+    });
+
+  } catch (err) {
+    console.error("Error fetching walking directions:", err.message);
+    res.status(500).json({ error: "Internal server error", message: err.message });
+  }
 };
