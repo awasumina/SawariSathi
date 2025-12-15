@@ -1320,3 +1320,99 @@ export const getDrivingDirections = async (req, res) => {
     res.status(500).json({ error: "Internal server error", message: err.message });
   }
 };
+
+// Google Places Autocomplete - for searching any place
+export const getPlacesAutocomplete = async (req, res) => {
+  const { input, location, radius = 50000 } = req.query;
+
+  try {
+    if (!input) {
+      return res.status(400).json({ error: "input query is required" });
+    }
+
+    // Build URL for Places Autocomplete
+    let url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input)}&key=${GOOGLE_MAPS_API_KEY}`;
+
+    // Add location bias for Nepal (Kathmandu area)
+    if (location) {
+      url += `&location=${location}&radius=${radius}`;
+    } else {
+      // Default to Kathmandu, Nepal for better results
+      url += `&location=27.7172,85.3240&radius=${radius}`;
+    }
+
+    // Restrict to Nepal
+    url += `&components=country:np`;
+
+    console.log(`Places Autocomplete search: "${input}"`);
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status !== 'OK' && data.status !== 'ZERO_RESULTS') {
+      console.error('Google Places Autocomplete error:', data.status, data.error_message);
+      return res.status(400).json({
+        error: 'Failed to fetch places',
+        status: data.status,
+        message: data.error_message
+      });
+    }
+
+    // Transform predictions to simpler format
+    const places = (data.predictions || []).map(prediction => ({
+      placeId: prediction.place_id,
+      name: prediction.structured_formatting?.main_text || prediction.description,
+      fullAddress: prediction.description,
+      types: prediction.types
+    }));
+
+    res.json({
+      places,
+      status: data.status
+    });
+  } catch (err) {
+    console.error("Error fetching places autocomplete:", err.message);
+    res.status(500).json({ error: "Internal server error", message: err.message });
+  }
+};
+
+// Get Place Details (coordinates) from Place ID
+export const getPlaceDetails = async (req, res) => {
+  const { placeId } = req.query;
+
+  try {
+    if (!placeId) {
+      return res.status(400).json({ error: "placeId is required" });
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=geometry,formatted_address,name&key=${GOOGLE_MAPS_API_KEY}`;
+
+    console.log(`Fetching place details for: ${placeId}`);
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status !== 'OK') {
+      console.error('Google Place Details error:', data.status, data.error_message);
+      return res.status(400).json({
+        error: 'Failed to fetch place details',
+        status: data.status,
+        message: data.error_message
+      });
+    }
+
+    const result = data.result;
+
+    res.json({
+      name: result.name,
+      address: result.formatted_address,
+      coordinates: {
+        latitude: result.geometry.location.lat,
+        longitude: result.geometry.location.lng
+      }
+    });
+  } catch (err) {
+    console.error("Error fetching place details:", err.message);
+    res.status(500).json({ error: "Internal server error", message: err.message });
+  }
+};

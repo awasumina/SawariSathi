@@ -11,7 +11,9 @@ import {
   getRoutesFromLocation,
   getRoutesBetweenLocations,
   getWalkingDirections,
-  getDrivingDirections
+  getDrivingDirections,
+  getPlacesAutocomplete,
+  getPlaceDetails
 } from '../controllers/routeControllers.js';
  
 import {
@@ -43,6 +45,10 @@ router.get('/routes/from-location', getRoutesFromLocation);
 router.get('/routes/between-locations', getRoutesBetweenLocations);
 router.get('/routes/walking-directions', getWalkingDirections);
 router.get('/routes/driving-directions', getDrivingDirections);
+
+// Google Places API routes
+router.get('/places/autocomplete', getPlacesAutocomplete);
+router.get('/places/details', getPlaceDetails);
 
 
 //dashboard
