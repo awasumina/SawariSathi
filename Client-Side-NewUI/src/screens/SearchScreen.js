@@ -1,5 +1,5 @@
 // src/screens/SearchScreen.js
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     View,
     Text,
@@ -311,14 +311,86 @@ const SearchScreen = ({ navigation, route }) => {
         }
     };
 
-    // Filter bus stops that match the search query
-    const filteredBusStops = locations.filter(location =>
-        location && location.name &&
-        location.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // Memoize filtered bus stops to prevent recalculation on every render
+    const filteredBusStops = useMemo(() => {
+        return locations.filter(location =>
+            location && location.name &&
+            location.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [locations, searchQuery]);
 
-    // Combine bus stops and Google Places
-    const filteredLocations = filteredBusStops;
+    // Memoize the dropdown options list
+    const dropdownOptions = useMemo(() => {
+        const allOptions = [];
+
+        // Add "My Location" option if GPS is available
+        if (userLocation) {
+            if (!searchQuery || LocationService.isCurrentLocationInput(searchQuery)) {
+                allOptions.push({
+                    id: 'my-location',
+                    name: 'My Location',
+                    isMyLocation: true,
+                    coordinates: userLocation,
+                    section: 'special'
+                });
+            }
+        }
+
+        // Check if the search query looks like coordinates
+        if (searchQuery && searchQuery.trim()) {
+            const coordinates = LocationService.parseCoordinateInput(searchQuery);
+            if (coordinates && LocationService.looksLikeCoordinates(searchQuery)) {
+                allOptions.push({
+                    id: 'coordinates',
+                    name: searchQuery.trim(),
+                    isCoordinates: true,
+                    coordinates,
+                    section: 'special'
+                });
+            }
+        }
+
+        // Add Bus Stops section header if there are bus stops
+        if (filteredBusStops && filteredBusStops.length > 0) {
+            allOptions.push({
+                id: 'header-bus-stops',
+                isHeader: true,
+                title: '🚌 Bus Stops',
+                section: 'header'
+            });
+            // Add bus stops (limit to 10 for performance)
+            filteredBusStops.slice(0, 10).forEach(stop => {
+                allOptions.push({
+                    ...stop,
+                    isBusStop: true,
+                    section: 'busStops'
+                });
+            });
+        }
+
+        // Add Google Places section header if there are places
+        if (googlePlaces && googlePlaces.length > 0) {
+            allOptions.push({
+                id: 'header-google-places',
+                isHeader: true,
+                title: '📍 Places',
+                section: 'header'
+            });
+            // Add Google Places
+            googlePlaces.forEach(place => {
+                allOptions.push({
+                    id: `place-${place.placeId}`,
+                    name: place.name,
+                    fullAddress: place.fullAddress,
+                    placeId: place.placeId,
+                    isGooglePlace: true,
+                    section: 'googlePlaces'
+                });
+            });
+        }
+
+        return allOptions;
+    }, [searchQuery, userLocation, filteredBusStops, googlePlaces]);
 
     const handleSearch = async () => {
         if (!fromLocation || !toLocation || fromLocation === toLocation) {
@@ -713,7 +785,7 @@ const SearchScreen = ({ navigation, route }) => {
 
 
     // Handle selection of a Google Place (fetch coordinates and store both name + coordinates)
-    const handleGooglePlaceSelect = async (place, onSelect, onClose, isFromLocation = true) => {
+    const handleGooglePlaceSelect = useCallback(async (place, onSelect, onClose, isFromLocation = true) => {
         try {
             setPlacesLoading(true);
             const coordinates = await getPlaceCoordinates(place.placeId);
@@ -748,10 +820,124 @@ const SearchScreen = ({ navigation, route }) => {
             setGooglePlaces([]);
             onClose();
         }
-    };
+    }, []);
+
+    // Memoized render item function to prevent re-renders
+    const renderDropdownItem = useCallback(({ item: location, onSelect, onClose, currentValue, isFromDropdown }) => {
+        // Render section header
+        if (location.isHeader) {
+            return (
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionHeaderText}>{location.title}</Text>
+                </View>
+            );
+        }
+
+        // Render Google Place item
+        if (location.isGooglePlace) {
+            return (
+                <TouchableOpacity
+                    style={styles.dropdownItem}
+                    onPress={() => handleGooglePlaceSelect(location, onSelect, onClose, isFromDropdown)}
+                >
+                    <View style={styles.locationInfo}>
+                        <View style={[styles.locationIconContainer, { backgroundColor: '#E8F5E9' }]}>
+                            <Ionicons name="location" size={16} color="#4CAF50" />
+                        </View>
+                        <View style={styles.locationTextContainer}>
+                            <Text style={styles.locationName}>{location.name}</Text>
+                            <Text style={styles.placeAddress} numberOfLines={1}>
+                                {location.fullAddress}
+                            </Text>
+                        </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={colors.secondaryText} />
+                </TouchableOpacity>
+            );
+        }
+
+        // Render regular item (My Location, Coordinates, Bus Stop)
+        return (
+            <TouchableOpacity
+                key={location.id}
+                style={[styles.dropdownItem, currentValue === location.name && styles.selectedItem]}
+                onPress={() => {
+                    onSelect(location.name);
+                    setSearchQuery('');
+                    setGooglePlaces([]);
+                    // Clear place info when selecting a bus stop (not a Google Place)
+                    if (isFromDropdown) {
+                        setFromPlaceInfo(null);
+                    } else {
+                        setToPlaceInfo(null);
+                    }
+                    onClose();
+                }}
+            >
+                <View style={styles.locationInfo}>
+                    <View style={[
+                        styles.locationIconContainer,
+                        location.isBusStop && { backgroundColor: '#E3F2FD' }
+                    ]}>
+                        <Ionicons
+                            name={
+                                location.isMyLocation ? "navigate-circle" :
+                                location.isCoordinates ? "navigate" :
+                                location.isBusStop ? "bus" : "location-sharp"
+                            }
+                            size={16}
+                            color={
+                                currentValue === location.name ? colors.background :
+                                location.isBusStop ? '#2196F3' : colors.primary
+                            }
+                        />
+                    </View>
+                    <View style={styles.locationTextContainer}>
+                        <Text style={[styles.locationName, currentValue === location.name && styles.selectedText]}>
+                            {location.isMyLocation ? 'My Location' :
+                             location.isCoordinates ? 'Use Coordinates' : location.name}
+                        </Text>
+                        {(location.isCoordinates || location.isMyLocation) && location.coordinates && (
+                            <Text style={styles.coordinateSubtext}>
+                                {location.coordinates.latitude.toFixed(4)}, {location.coordinates.longitude.toFixed(4)}
+                            </Text>
+                        )}
+                        {location.isBusStop && (
+                            <Text style={styles.busStopLabel}>Bus Stop</Text>
+                        )}
+                    </View>
+                </View>
+                {currentValue === location.name && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+            </TouchableOpacity>
+        );
+    }, [handleGooglePlaceSelect]);
+
+    // Memoized empty component
+    const ListEmptyComponent = useMemo(() => (
+        <View style={styles.noResultsContainer}>
+            {placesLoading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={styles.loadingText}>Searching places...</Text>
+                </View>
+            ) : (
+                <>
+                    <Text style={styles.noResultsText}>No locations found</Text>
+                    <Text style={styles.noResultsHint}>
+                        Try searching for a place name or paste coordinates
+                    </Text>
+                </>
+            )}
+            {LocationService.looksLikeCoordinates(searchQuery) && (
+                <Text style={styles.noResultsHint}>
+                    Tip: Make sure coordinates are in format "latitude, longitude"
+                </Text>
+            )}
+        </View>
+    ), [placesLoading, searchQuery]);
 
     const LocationDropdown = ({ visible, onClose, onSelect, currentValue, isFromDropdown = true }) => (
-        <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
+        <Modal visible={visible} transparent={true} animationType="none" onRequestClose={onClose}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
                 <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
                     <View style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
@@ -778,194 +964,20 @@ const SearchScreen = ({ navigation, route }) => {
 
                         {/* Section Headers and Combined List */}
                         <FlatList
-                            data={(() => {
-                                try {
-                                    const allOptions = [];
-
-                                    // Add "My Location" option if GPS is available and this is the FROM dropdown
-                                    if (userLocation && visible && showFromDropdown) {
-                                        if (!searchQuery || LocationService.isCurrentLocationInput(searchQuery)) {
-                                            allOptions.push({
-                                                id: 'my-location',
-                                                name: 'My Location',
-                                                isMyLocation: true,
-                                                coordinates: userLocation,
-                                                section: 'special'
-                                            });
-                                        }
-                                    }
-
-                                    // Check if the search query looks like coordinates
-                                    if (searchQuery && searchQuery.trim()) {
-                                        const coordinates = LocationService.parseCoordinateInput(searchQuery);
-                                        if (coordinates && LocationService.looksLikeCoordinates(searchQuery)) {
-                                            allOptions.push({
-                                                id: 'coordinates',
-                                                name: searchQuery.trim(),
-                                                isCoordinates: true,
-                                                coordinates,
-                                                section: 'special'
-                                            });
-                                        }
-                                    }
-
-                                    // Add Bus Stops section header if there are bus stops
-                                    if (filteredBusStops && filteredBusStops.length > 0) {
-                                        allOptions.push({
-                                            id: 'header-bus-stops',
-                                            isHeader: true,
-                                            title: '🚌 Bus Stops',
-                                            section: 'header'
-                                        });
-                                        // Add bus stops (limit to 10 for performance)
-                                        filteredBusStops.slice(0, 10).forEach(stop => {
-                                            allOptions.push({
-                                                ...stop,
-                                                isBusStop: true,
-                                                section: 'busStops'
-                                            });
-                                        });
-                                    }
-
-                                    // Add Google Places section header if there are places
-                                    if (googlePlaces && googlePlaces.length > 0) {
-                                        allOptions.push({
-                                            id: 'header-google-places',
-                                            isHeader: true,
-                                            title: '📍 Places',
-                                            section: 'header'
-                                        });
-                                        // Add Google Places
-                                        googlePlaces.forEach(place => {
-                                            allOptions.push({
-                                                id: `place-${place.placeId}`,
-                                                name: place.name,
-                                                fullAddress: place.fullAddress,
-                                                placeId: place.placeId,
-                                                isGooglePlace: true,
-                                                section: 'googlePlaces'
-                                            });
-                                        });
-                                    }
-
-                                    return allOptions;
-                                } catch (error) {
-                                    console.error('Error in dropdown data creation:', error);
-                                    return filteredLocations || [];
-                                }
-                            })()}
+                            data={dropdownOptions}
                             keyExtractor={(item) => item.id.toString()}
-                            renderItem={({ item: location }) => {
-                                // Render section header
-                                if (location.isHeader) {
-                                    return (
-                                        <View style={styles.sectionHeader}>
-                                            <Text style={styles.sectionHeaderText}>{location.title}</Text>
-                                        </View>
-                                    );
-                                }
-
-                                // Render Google Place item
-                                if (location.isGooglePlace) {
-                                    return (
-                                        <TouchableOpacity
-                                            style={styles.dropdownItem}
-                                            onPress={() => handleGooglePlaceSelect(location, onSelect, onClose, isFromDropdown)}
-                                        >
-                                            <View style={styles.locationInfo}>
-                                                <View style={[styles.locationIconContainer, { backgroundColor: '#E8F5E9' }]}>
-                                                    <Ionicons name="location" size={16} color="#4CAF50" />
-                                                </View>
-                                                <View style={styles.locationTextContainer}>
-                                                    <Text style={styles.locationName}>{location.name}</Text>
-                                                    <Text style={styles.placeAddress} numberOfLines={1}>
-                                                        {location.fullAddress}
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                            <Ionicons name="chevron-forward" size={16} color={colors.secondaryText} />
-                                        </TouchableOpacity>
-                                    );
-                                }
-
-                                // Render regular item (My Location, Coordinates, Bus Stop)
-                                return (
-                                    <TouchableOpacity
-                                        key={location.id}
-                                        style={[styles.dropdownItem, currentValue === location.name && styles.selectedItem]}
-                                        onPress={() => {
-                                            onSelect(location.name);
-                                            setSearchQuery('');
-                                            setGooglePlaces([]);
-                                            // Clear place info when selecting a bus stop (not a Google Place)
-                                            if (isFromDropdown) {
-                                                setFromPlaceInfo(null);
-                                            } else {
-                                                setToPlaceInfo(null);
-                                            }
-                                            onClose();
-                                        }}
-                                    >
-                                        <View style={styles.locationInfo}>
-                                            <View style={[
-                                                styles.locationIconContainer,
-                                                location.isBusStop && { backgroundColor: '#E3F2FD' }
-                                            ]}>
-                                                <Ionicons
-                                                    name={
-                                                        location.isMyLocation ? "navigate-circle" :
-                                                        location.isCoordinates ? "navigate" :
-                                                        location.isBusStop ? "bus" : "location-sharp"
-                                                    }
-                                                    size={16}
-                                                    color={
-                                                        currentValue === location.name ? colors.background :
-                                                        location.isBusStop ? '#2196F3' : colors.primary
-                                                    }
-                                                />
-                                            </View>
-                                            <View style={styles.locationTextContainer}>
-                                                <Text style={[styles.locationName, currentValue === location.name && styles.selectedText]}>
-                                                    {location.isMyLocation ? 'My Location' :
-                                                     location.isCoordinates ? 'Use Coordinates' : location.name}
-                                                </Text>
-                                                {(location.isCoordinates || location.isMyLocation) && location.coordinates && (
-                                                    <Text style={styles.coordinateSubtext}>
-                                                        {location.coordinates.latitude.toFixed(4)}, {location.coordinates.longitude.toFixed(4)}
-                                                    </Text>
-                                                )}
-                                                {location.isBusStop && (
-                                                    <Text style={styles.busStopLabel}>Bus Stop</Text>
-                                                )}
-                                            </View>
-                                        </View>
-                                        {currentValue === location.name && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
-                                    </TouchableOpacity>
-                                );
-                            }}
+                            renderItem={({ item }) => renderDropdownItem({
+                                item,
+                                onSelect,
+                                onClose,
+                                currentValue,
+                                isFromDropdown
+                            })}
                             style={styles.dropdownList}
-                            ListEmptyComponent={
-                                <View style={styles.noResultsContainer}>
-                                    {placesLoading ? (
-                                        <View style={styles.loadingContainer}>
-                                            <ActivityIndicator size="small" color={colors.primary} />
-                                            <Text style={styles.loadingText}>Searching places...</Text>
-                                        </View>
-                                    ) : (
-                                        <>
-                                            <Text style={styles.noResultsText}>No locations found</Text>
-                                            <Text style={styles.noResultsHint}>
-                                                Try searching for a place name or paste coordinates
-                                            </Text>
-                                        </>
-                                    )}
-                                    {LocationService.looksLikeCoordinates(searchQuery) && (
-                                        <Text style={styles.noResultsHint}>
-                                            Tip: Make sure coordinates are in format "latitude, longitude"
-                                        </Text>
-                                    )}
-                                </View>
-                            }
+                            ListEmptyComponent={ListEmptyComponent}
+                            removeClippedSubviews={true}
+                            maxToRenderPerBatch={10}
+                            windowSize={5}
                         />
                     </View>
                 </TouchableOpacity>
