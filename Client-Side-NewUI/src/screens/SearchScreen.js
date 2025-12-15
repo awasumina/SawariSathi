@@ -1,5 +1,5 @@
 // src/screens/SearchScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -153,7 +153,11 @@ const SearchScreen = ({ navigation, route }) => {
     // Google Places Autocomplete state
     const [googlePlaces, setGooglePlaces] = useState([]);
     const [placesLoading, setPlacesLoading] = useState(false);
-    const [searchDebounceTimer, setSearchDebounceTimer] = useState(null);
+    const searchDebounceTimerRef = useRef(null);
+
+    // Store selected place info (display name + coordinates)
+    const [fromPlaceInfo, setFromPlaceInfo] = useState(null); // { displayName, coordinates }
+    const [toPlaceInfo, setToPlaceInfo] = useState(null); // { displayName, coordinates }
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -272,24 +276,24 @@ const SearchScreen = ({ navigation, route }) => {
         }
     };
 
-    // Debounced search for Google Places
+    // Debounced search for Google Places - using ref to avoid re-renders
     useEffect(() => {
-        if (searchDebounceTimer) {
-            clearTimeout(searchDebounceTimer);
+        // Clear any existing timer
+        if (searchDebounceTimerRef.current) {
+            clearTimeout(searchDebounceTimerRef.current);
         }
 
         if (searchQuery && searchQuery.length >= 2) {
-            const timer = setTimeout(() => {
+            searchDebounceTimerRef.current = setTimeout(() => {
                 fetchGooglePlaces(searchQuery);
             }, 300); // 300ms debounce
-            setSearchDebounceTimer(timer);
         } else {
             setGooglePlaces([]);
         }
 
         return () => {
-            if (searchDebounceTimer) {
-                clearTimeout(searchDebounceTimer);
+            if (searchDebounceTimerRef.current) {
+                clearTimeout(searchDebounceTimerRef.current);
             }
         };
     }, [searchQuery]);
@@ -331,10 +335,24 @@ const SearchScreen = ({ navigation, route }) => {
                 return;
             }
 
+            // Determine actual search values - use stored coordinates for Google Places
+            let searchFromLocation = fromLocation.trim();
+            let searchToLocation = toLocation.trim();
+
+            // If user selected a Google Place, use the stored coordinates for the actual search
+            if (fromPlaceInfo && fromPlaceInfo.displayName === fromLocation) {
+                searchFromLocation = fromPlaceInfo.coordString;
+                console.log(`🔄 Using stored coordinates for FROM: ${fromLocation} → ${searchFromLocation}`);
+            }
+            if (toPlaceInfo && toPlaceInfo.displayName === toLocation) {
+                searchToLocation = toPlaceInfo.coordString;
+                console.log(`🔄 Using stored coordinates for TO: ${toLocation} → ${searchToLocation}`);
+            }
+
             // Use the enhanced smart route search that handles all cases
             const routeData = await LocationService.smartRouteSearch(
-                fromLocation.trim(),
-                toLocation.trim(),
+                searchFromLocation,
+                searchToLocation,
                 userLocation,
                 locations
             );
@@ -694,16 +712,29 @@ const SearchScreen = ({ navigation, route }) => {
     };
 
 
-    // Handle selection of a Google Place (fetch coordinates and use them)
-    const handleGooglePlaceSelect = async (place, onSelect, onClose) => {
+    // Handle selection of a Google Place (fetch coordinates and store both name + coordinates)
+    const handleGooglePlaceSelect = async (place, onSelect, onClose, isFromLocation = true) => {
         try {
             setPlacesLoading(true);
             const coordinates = await getPlaceCoordinates(place.placeId);
             if (coordinates) {
-                // Use coordinates as the location value (format: "lat,lng")
-                const coordString = `${coordinates.latitude},${coordinates.longitude}`;
-                onSelect(coordString);
-                console.log(`📍 Selected Google Place: ${place.name} → ${coordString}`);
+                // Store the place info (display name + coordinates) for later use in search
+                const placeInfo = {
+                    displayName: place.name,
+                    coordinates: coordinates,
+                    coordString: `${coordinates.latitude},${coordinates.longitude}`
+                };
+
+                // Store in the appropriate state based on which dropdown
+                if (isFromLocation) {
+                    setFromPlaceInfo(placeInfo);
+                } else {
+                    setToPlaceInfo(placeInfo);
+                }
+
+                // Show the friendly place name to the user (not coordinates)
+                onSelect(place.name);
+                console.log(`📍 Selected Google Place: ${place.name} → ${placeInfo.coordString}`);
             } else {
                 // Fallback to place name if coordinates fetch fails
                 onSelect(place.name);
@@ -719,7 +750,7 @@ const SearchScreen = ({ navigation, route }) => {
         }
     };
 
-    const LocationDropdown = ({ visible, onClose, onSelect, currentValue }) => (
+    const LocationDropdown = ({ visible, onClose, onSelect, currentValue, isFromDropdown = true }) => (
         <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
                 <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
@@ -734,7 +765,7 @@ const SearchScreen = ({ navigation, route }) => {
                             <Ionicons name="search" size={20} color={colors.secondaryText} style={styles.searchIcon} />
                             <TextInput
                                 style={styles.searchInput}
-                                placeholder="Search any place (The Plaza, Bhatbhateni...)"
+                                placeholder="Search any place"
                                 placeholderTextColor={colors.secondaryText}
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
@@ -839,7 +870,7 @@ const SearchScreen = ({ navigation, route }) => {
                                     return (
                                         <TouchableOpacity
                                             style={styles.dropdownItem}
-                                            onPress={() => handleGooglePlaceSelect(location, onSelect, onClose)}
+                                            onPress={() => handleGooglePlaceSelect(location, onSelect, onClose, isFromDropdown)}
                                         >
                                             <View style={styles.locationInfo}>
                                                 <View style={[styles.locationIconContainer, { backgroundColor: '#E8F5E9' }]}>
@@ -862,7 +893,18 @@ const SearchScreen = ({ navigation, route }) => {
                                     <TouchableOpacity
                                         key={location.id}
                                         style={[styles.dropdownItem, currentValue === location.name && styles.selectedItem]}
-                                        onPress={() => { onSelect(location.name); setSearchQuery(''); setGooglePlaces([]); onClose(); }}
+                                        onPress={() => {
+                                            onSelect(location.name);
+                                            setSearchQuery('');
+                                            setGooglePlaces([]);
+                                            // Clear place info when selecting a bus stop (not a Google Place)
+                                            if (isFromDropdown) {
+                                                setFromPlaceInfo(null);
+                                            } else {
+                                                setToPlaceInfo(null);
+                                            }
+                                            onClose();
+                                        }}
                                     >
                                         <View style={styles.locationInfo}>
                                             <View style={[
@@ -1007,7 +1049,16 @@ const SearchScreen = ({ navigation, route }) => {
 
                         {/* Swap Button */}
                         <View style={styles.swapButtonContainer}>
-                            <TouchableOpacity style={styles.swapButton} onPress={() => { const temp = fromLocation; setFromLocation(toLocation); setToLocation(temp); }}>
+                            <TouchableOpacity style={styles.swapButton} onPress={() => {
+                                // Swap locations
+                                const tempLoc = fromLocation;
+                                setFromLocation(toLocation);
+                                setToLocation(tempLoc);
+                                // Also swap place info
+                                const tempInfo = fromPlaceInfo;
+                                setFromPlaceInfo(toPlaceInfo);
+                                setToPlaceInfo(tempInfo);
+                            }}>
                                 <MaterialCommunityIcons name="swap-vertical" size={18} color={colors.background} />
                             </TouchableOpacity>
                         </View>
@@ -1088,12 +1139,14 @@ const SearchScreen = ({ navigation, route }) => {
                 onClose={() => setShowFromDropdown(false)}
                 onSelect={setFromLocation}
                 currentValue={fromLocation}
+                isFromDropdown={true}
             />
             <LocationDropdown
                 visible={showToDropdown}
                 onClose={() => setShowToDropdown(false)}
                 onSelect={setToLocation}
                 currentValue={toLocation}
+                isFromDropdown={false}
             />
         </SafeAreaView>
     );
