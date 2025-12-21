@@ -1,5 +1,5 @@
 // src/screens/SearchScreen.js
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import {
     View,
     Text,
@@ -26,6 +26,157 @@ import { LocationService } from '../utils/locationService';
 // const API_BASE_URL = 'http://192.168.101.2:3000/api'; // Ensure correct IP
 const RECENT_SEARCHES_KEY = '@recent_searches';
 const MAX_RECENT_SEARCHES = 20;
+
+// LocationDropdown component moved OUTSIDE of SearchScreen to prevent re-creation on every render
+const LocationDropdown = memo(({
+    visible,
+    onClose,
+    onSelect,
+    currentValue,
+    isFromDropdown,
+    searchQuery,
+    setSearchQuery,
+    placesLoading,
+    dropdownOptions,
+    onGooglePlaceSelect,
+    onRegularItemSelect
+}) => {
+    if (!visible) return null;
+
+    return (
+        <Modal visible={visible} transparent={true} animationType="none" onRequestClose={onClose}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+                    <View style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
+                        <View style={styles.dropdownHeader}>
+                            <Text style={styles.dropdownTitle}>Select Location</Text>
+                            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                                <Ionicons name="close" size={24} color={colors.primaryText} />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.searchContainer}>
+                            <Ionicons name="search" size={20} color={colors.secondaryText} style={styles.searchIcon} />
+                            <TextInput
+                                style={styles.searchInput}
+                                placeholder="Search any place"
+                                placeholderTextColor={colors.secondaryText}
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
+                                autoFocus={true}
+                            />
+                            {placesLoading && (
+                                <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
+                            )}
+                        </View>
+
+                        <FlatList
+                            data={dropdownOptions}
+                            keyExtractor={(item) => item.id.toString()}
+                            renderItem={({ item: location }) => {
+                                // Render section header
+                                if (location.isHeader) {
+                                    return (
+                                        <View style={styles.sectionHeader}>
+                                            <Text style={styles.sectionHeaderText}>{location.title}</Text>
+                                        </View>
+                                    );
+                                }
+
+                                // Render Google Place item
+                                if (location.isGooglePlace) {
+                                    return (
+                                        <TouchableOpacity
+                                            style={styles.dropdownItem}
+                                            onPress={() => onGooglePlaceSelect(location, onSelect, onClose, isFromDropdown)}
+                                        >
+                                            <View style={styles.locationInfo}>
+                                                <View style={[styles.locationIconContainer, { backgroundColor: '#E8F5E9' }]}>
+                                                    <Ionicons name="location" size={16} color="#4CAF50" />
+                                                </View>
+                                                <View style={styles.locationTextContainer}>
+                                                    <Text style={styles.locationName}>{location.name}</Text>
+                                                    <Text style={styles.placeAddress} numberOfLines={1}>
+                                                        {location.fullAddress}
+                                                    </Text>
+                                                </View>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={16} color={colors.secondaryText} />
+                                        </TouchableOpacity>
+                                    );
+                                }
+
+                                // Render regular item (My Location, Coordinates, Bus Stop)
+                                return (
+                                    <TouchableOpacity
+                                        style={[styles.dropdownItem, currentValue === location.name && styles.selectedItem]}
+                                        onPress={() => onRegularItemSelect(location, onSelect, onClose, isFromDropdown)}
+                                    >
+                                        <View style={styles.locationInfo}>
+                                            <View style={[
+                                                styles.locationIconContainer,
+                                                location.isBusStop && { backgroundColor: '#E3F2FD' }
+                                            ]}>
+                                                <Ionicons
+                                                    name={
+                                                        location.isMyLocation ? "navigate-circle" :
+                                                        location.isCoordinates ? "navigate" :
+                                                        location.isBusStop ? "bus" : "location-sharp"
+                                                    }
+                                                    size={16}
+                                                    color={
+                                                        currentValue === location.name ? colors.background :
+                                                        location.isBusStop ? '#2196F3' : colors.primary
+                                                    }
+                                                />
+                                            </View>
+                                            <View style={styles.locationTextContainer}>
+                                                <Text style={[styles.locationName, currentValue === location.name && styles.selectedText]}>
+                                                    {location.isMyLocation ? 'My Location' :
+                                                     location.isCoordinates ? 'Use Coordinates' : location.name}
+                                                </Text>
+                                                {(location.isCoordinates || location.isMyLocation) && location.coordinates && (
+                                                    <Text style={styles.coordinateSubtext}>
+                                                        {location.coordinates.latitude.toFixed(4)}, {location.coordinates.longitude.toFixed(4)}
+                                                    </Text>
+                                                )}
+                                                {location.isBusStop && (
+                                                    <Text style={styles.busStopLabel}>Bus Stop</Text>
+                                                )}
+                                            </View>
+                                        </View>
+                                        {currentValue === location.name && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                                    </TouchableOpacity>
+                                );
+                            }}
+                            style={styles.dropdownList}
+                            ListEmptyComponent={
+                                <View style={styles.noResultsContainer}>
+                                    {placesLoading ? (
+                                        <View style={styles.loadingContainer}>
+                                            <ActivityIndicator size="small" color={colors.primary} />
+                                            <Text style={styles.loadingText}>Searching places...</Text>
+                                        </View>
+                                    ) : (
+                                        <>
+                                            <Text style={styles.noResultsText}>No locations found</Text>
+                                            <Text style={styles.noResultsHint}>
+                                                Try searching for a place name or paste coordinates
+                                            </Text>
+                                        </>
+                                    )}
+                                </View>
+                            }
+                            removeClippedSubviews={true}
+                            maxToRenderPerBatch={10}
+                            windowSize={5}
+                            initialNumToRender={10}
+                        />
+                    </View>
+                </TouchableOpacity>
+            </KeyboardAvoidingView>
+        </Modal>
+    );
+});
 
 export const transformRouteData = (apiDetailData, fromStopId, toStopId, isMultiLeg = false, transferStop = null, secondLeg = null) => {
     const calculateDistance = (stops, fromId, toId) => {
@@ -822,168 +973,19 @@ const SearchScreen = ({ navigation, route }) => {
         }
     }, []);
 
-    // Memoized render item function to prevent re-renders
-    const renderDropdownItem = useCallback(({ item: location, onSelect, onClose, currentValue, isFromDropdown }) => {
-        // Render section header
-        if (location.isHeader) {
-            return (
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionHeaderText}>{location.title}</Text>
-                </View>
-            );
+    // Handle selection of regular items (bus stops, coordinates, my location)
+    const handleRegularItemSelect = useCallback((location, onSelect, onClose, isFromDropdown) => {
+        onSelect(location.name);
+        setSearchQuery('');
+        setGooglePlaces([]);
+        // Clear place info when selecting a bus stop (not a Google Place)
+        if (isFromDropdown) {
+            setFromPlaceInfo(null);
+        } else {
+            setToPlaceInfo(null);
         }
-
-        // Render Google Place item
-        if (location.isGooglePlace) {
-            return (
-                <TouchableOpacity
-                    style={styles.dropdownItem}
-                    onPress={() => handleGooglePlaceSelect(location, onSelect, onClose, isFromDropdown)}
-                >
-                    <View style={styles.locationInfo}>
-                        <View style={[styles.locationIconContainer, { backgroundColor: '#E8F5E9' }]}>
-                            <Ionicons name="location" size={16} color="#4CAF50" />
-                        </View>
-                        <View style={styles.locationTextContainer}>
-                            <Text style={styles.locationName}>{location.name}</Text>
-                            <Text style={styles.placeAddress} numberOfLines={1}>
-                                {location.fullAddress}
-                            </Text>
-                        </View>
-                    </View>
-                    <Ionicons name="chevron-forward" size={16} color={colors.secondaryText} />
-                </TouchableOpacity>
-            );
-        }
-
-        // Render regular item (My Location, Coordinates, Bus Stop)
-        return (
-            <TouchableOpacity
-                key={location.id}
-                style={[styles.dropdownItem, currentValue === location.name && styles.selectedItem]}
-                onPress={() => {
-                    onSelect(location.name);
-                    setSearchQuery('');
-                    setGooglePlaces([]);
-                    // Clear place info when selecting a bus stop (not a Google Place)
-                    if (isFromDropdown) {
-                        setFromPlaceInfo(null);
-                    } else {
-                        setToPlaceInfo(null);
-                    }
-                    onClose();
-                }}
-            >
-                <View style={styles.locationInfo}>
-                    <View style={[
-                        styles.locationIconContainer,
-                        location.isBusStop && { backgroundColor: '#E3F2FD' }
-                    ]}>
-                        <Ionicons
-                            name={
-                                location.isMyLocation ? "navigate-circle" :
-                                location.isCoordinates ? "navigate" :
-                                location.isBusStop ? "bus" : "location-sharp"
-                            }
-                            size={16}
-                            color={
-                                currentValue === location.name ? colors.background :
-                                location.isBusStop ? '#2196F3' : colors.primary
-                            }
-                        />
-                    </View>
-                    <View style={styles.locationTextContainer}>
-                        <Text style={[styles.locationName, currentValue === location.name && styles.selectedText]}>
-                            {location.isMyLocation ? 'My Location' :
-                             location.isCoordinates ? 'Use Coordinates' : location.name}
-                        </Text>
-                        {(location.isCoordinates || location.isMyLocation) && location.coordinates && (
-                            <Text style={styles.coordinateSubtext}>
-                                {location.coordinates.latitude.toFixed(4)}, {location.coordinates.longitude.toFixed(4)}
-                            </Text>
-                        )}
-                        {location.isBusStop && (
-                            <Text style={styles.busStopLabel}>Bus Stop</Text>
-                        )}
-                    </View>
-                </View>
-                {currentValue === location.name && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
-            </TouchableOpacity>
-        );
-    }, [handleGooglePlaceSelect]);
-
-    // Memoized empty component
-    const ListEmptyComponent = useMemo(() => (
-        <View style={styles.noResultsContainer}>
-            {placesLoading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={styles.loadingText}>Searching places...</Text>
-                </View>
-            ) : (
-                <>
-                    <Text style={styles.noResultsText}>No locations found</Text>
-                    <Text style={styles.noResultsHint}>
-                        Try searching for a place name or paste coordinates
-                    </Text>
-                </>
-            )}
-            {LocationService.looksLikeCoordinates(searchQuery) && (
-                <Text style={styles.noResultsHint}>
-                    Tip: Make sure coordinates are in format "latitude, longitude"
-                </Text>
-            )}
-        </View>
-    ), [placesLoading, searchQuery]);
-
-    const LocationDropdown = ({ visible, onClose, onSelect, currentValue, isFromDropdown = true }) => (
-        <Modal visible={visible} transparent={true} animationType="none" onRequestClose={onClose}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalContainer}>
-                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-                    <View style={styles.dropdownContainer} onStartShouldSetResponder={() => true}>
-                        <View style={styles.dropdownHeader}>
-                            <Text style={styles.dropdownTitle}>Select Location</Text>
-                            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                                <Ionicons name="close" size={24} color={colors.primaryText} />
-                            </TouchableOpacity>
-                        </View>
-                        <View style={styles.searchContainer}>
-                            <Ionicons name="search" size={20} color={colors.secondaryText} style={styles.searchIcon} />
-                            <TextInput
-                                style={styles.searchInput}
-                                placeholder="Search any place"
-                                placeholderTextColor={colors.secondaryText}
-                                value={searchQuery}
-                                onChangeText={setSearchQuery}
-                                autoFocus={true}
-                            />
-                            {placesLoading && (
-                                <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
-                            )}
-                        </View>
-
-                        {/* Section Headers and Combined List */}
-                        <FlatList
-                            data={dropdownOptions}
-                            keyExtractor={(item) => item.id.toString()}
-                            renderItem={({ item }) => renderDropdownItem({
-                                item,
-                                onSelect,
-                                onClose,
-                                currentValue,
-                                isFromDropdown
-                            })}
-                            style={styles.dropdownList}
-                            ListEmptyComponent={ListEmptyComponent}
-                            removeClippedSubviews={true}
-                            maxToRenderPerBatch={10}
-                            windowSize={5}
-                        />
-                    </View>
-                </TouchableOpacity>
-            </KeyboardAvoidingView>
-        </Modal>
-    );
+        onClose();
+    }, []);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -1152,6 +1154,12 @@ const SearchScreen = ({ navigation, route }) => {
                 onSelect={setFromLocation}
                 currentValue={fromLocation}
                 isFromDropdown={true}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                placesLoading={placesLoading}
+                dropdownOptions={dropdownOptions}
+                onGooglePlaceSelect={handleGooglePlaceSelect}
+                onRegularItemSelect={handleRegularItemSelect}
             />
             <LocationDropdown
                 visible={showToDropdown}
@@ -1159,6 +1167,12 @@ const SearchScreen = ({ navigation, route }) => {
                 onSelect={setToLocation}
                 currentValue={toLocation}
                 isFromDropdown={false}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                placesLoading={placesLoading}
+                dropdownOptions={dropdownOptions}
+                onGooglePlaceSelect={handleGooglePlaceSelect}
+                onRegularItemSelect={handleRegularItemSelect}
             />
         </SafeAreaView>
     );
