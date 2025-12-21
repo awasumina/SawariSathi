@@ -9,6 +9,10 @@ import VehicleDetails from '../components/VehicleDetails';
 import MapScreen from '../screens/MapScreen';
 import NoticeScreen from '../screens/NoticeScreen';
 import NoticeDetailScreen from '../screens/NoticeDetailScreen';
+import LoginScreen from '../screens/LoginScreen';
+import RegisterScreen from '../screens/RegisterScreen';
+import OTPVerificationScreen from '../screens/OTPVerificationScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../constants/theme';
 import RecentSearchesScreen from '../components/RecentSearchesScreen';
@@ -80,6 +84,17 @@ const BottomTabs = () => {
           ),
         }}
       />
+      <Tab.Screen
+        name="ProfileTab"
+        component={ProfileScreen}
+        options={{
+          headerShown: false,
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="person" size={size} color={color} />
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 };
@@ -98,6 +113,24 @@ const StackNavigator = () => {
           },
         }}
       >
+        {/* Authentication Screens */}
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Register"
+          component={RegisterScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="OTPVerification"
+          component={OTPVerificationScreen}
+          options={{ headerShown: false }}
+        />
+        
+        {/* Main App Screens */}
         <Stack.Screen
           name="Main"
           component={BottomTabs}

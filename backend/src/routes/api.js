@@ -31,7 +31,23 @@ import {
   addFaredb
 } from '../controllers/dashboardController.js';
 
+import {
+  userSignup,
+  userLogin,
+  getUserProfile,
+  updateUserProfile,
+  verifyOTP,
+  resendOTP
+} from '../controllers/authController.js';
+
+// Middleware
+import { authMiddleware } from '../middleware/authMiddleware.js';
+import { loginLimiter, signupLimiter, generalLimiter } from '../middleware/rateLimiter.js';
+
 const router = express.Router();
+
+// Apply general rate limiter to all API routes
+router.use(generalLimiter);
 
 router.get('/fare', getFare);
 router.get('/stops', getAllStops);
@@ -104,6 +120,30 @@ router.delete('/deleteRoute/:id', async (req, res) => {
 
 router.post('/addFare', addFaredb);
 router.get('/getFare', getFaredb);
+
+
+// ============================================
+// SECURE Authentication Routes (With Rate Limiting)
+// ============================================
+
+// User Signup/Register (with rate limiting) - Sends OTP to email
+router.post('/auth/signup', signupLimiter, userSignup);
+
+// Verify OTP after signup (with rate limiting)
+router.post('/auth/verify-otp', signupLimiter, verifyOTP);
+
+// Resend OTP if user didn't receive (with rate limiting)
+router.post('/auth/resend-otp', signupLimiter, resendOTP);
+
+// User Login (with rate limiting) - Requires verified email
+router.post('/auth/login', loginLimiter, userLogin);
+
+// Get User Profile (protected with JWT)
+router.get('/auth/profile/:id', authMiddleware, getUserProfile);
+
+// Update User Profile (protected with JWT)
+router.put('/auth/profile/:id', authMiddleware, updateUserProfile);
+
 
 // console.log(listEndpoints(router));
 

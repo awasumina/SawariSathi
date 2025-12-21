@@ -1,16 +1,95 @@
 import React, { useState, useEffect } from "react";
-import { StyleSheet, Text, View, SafeAreaView, Image, KeyboardAvoidingView, TextInput, Pressable, Alert, Platform, Dimensions, ActivityIndicator } from "react-native";
-import { MaterialIcons, AntDesign } from "@expo/vector-icons";
+import {
+  StyleSheet,
+  Text,
+  View,
+  SafeAreaView,
+  KeyboardAvoidingView,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  Platform,
+  ActivityIndicator,
+  ScrollView,
+} from "react-native";
+import { MaterialIcons, AntDesign, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from "@react-navigation/native";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AUTH_API_BASE_URL } from "../config/api";
+import { fontSizes } from '../constants/theme';
 
-const { width } = Dimensions.get('window');
+const COLORS = {
+  primary: '#F96E2A',
+  accent: '#4A90E2',
+  background: '#F8FAFC',
+  white: '#FFFFFF',
+  text: '#1F2937',
+  muted: '#6B7280',
+  error: '#EF4444',
+};
+
+const InputField = ({
+  iconType,
+  iconName,
+  placeholder,
+  value,
+  onChangeText,
+  keyboardType = "default",
+  secureTextEntry = false,
+  fieldName,
+  uiState,
+  setUiState,
+  editable = true,
+}) => {
+  const hasError = uiState.errors[fieldName];
+  const IconComponent = iconType === "MaterialIcons" ? MaterialIcons : AntDesign;
+  
+  return (
+    <View style={styles.inputGroup}>
+      <View style={[styles.inputWrapper, hasError && styles.inputWrapperError]}>
+        <View style={styles.iconContainer}>
+          <IconComponent name={iconName} size={20} color={COLORS.primary} />
+        </View>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          style={styles.input}
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.muted}
+          keyboardType={keyboardType}
+          autoCapitalize={keyboardType === "email-address" ? "none" : "sentences"}
+          secureTextEntry={secureTextEntry && !uiState.showPassword}
+          editable={editable}
+        />
+        {fieldName === 'password' && (
+          <TouchableOpacity
+            onPress={() => setUiState(prev => ({ ...prev, showPassword: !prev.showPassword }))}
+            style={styles.eyeIcon}
+            disabled={!editable}
+            activeOpacity={0.7}
+          >
+            <MaterialIcons
+              name={uiState.showPassword ? "visibility" : "visibility-off"}
+              size={22}
+              color={COLORS.muted}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
+      {hasError && <Text style={styles.errorText}>{hasError}</Text>}
+    </View>
+  );
+};
 
 const LoginScreen = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [uiState, setUiState] = useState({ 
+    isLoading: false, 
+    showPassword: false, 
+    errors: {} 
+  });
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -21,233 +100,286 @@ const LoginScreen = () => {
     try {
       const token = await AsyncStorage.getItem("authToken");
       if (token) {
-        navigation.replace("Home"); // If user is already logged in, navigate to Home
+        navigation.replace("Main");
       }
     } catch (err) {
       console.log("Error checking auth status:", err);
     }
   };
 
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
   const validateForm = () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert("Error", "Please fill in all fields");
-      return false;
+    const errors = {};
+    if (!formData.email.trim()) {
+      errors.email = "Email is required";
+    } else if (!validateEmail(formData.email)) {
+      errors.email = "Enter a valid email";
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert("Error", "Please enter a valid email address");
-      return false;
+    
+    if (!formData.password.trim()) {
+      errors.password = "Password is required";
+    } else if (formData.password.length < 6) {
+      errors.password = "Password must be at least 6 characters";
     }
+    
+    setUiState(prev => ({ ...prev, errors }));
+    return Object.keys(errors).length === 0;
+  };
 
-    // Ensure password is strong enough
-    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/;
-    if (!passwordRegex.test(password)) {
-      Alert.alert("Error", "Password must be at least 6 characters and contain a number and a special character");
-      return false;
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (uiState.errors[field]) {
+      setUiState(prev => ({
+        ...prev, 
+        errors: { ...prev.errors, [field]: null }
+      }));
     }
-
-    return true;
   };
 
   const handleLogin = async () => {
     if (!validateForm()) return;
 
-    setLoading(true);
+    setUiState(prev => ({ ...prev, isLoading: true }));
     try {
-      const response = await axios.post("http://192.168.1.113:5002/api/auth/login/", {
-        email: email.trim(),
-        password: password
+      const response = await axios.post(`${AUTH_API_BASE_URL}/login`, {
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password
       });
 
-      const { token, user } = response.data;
-      
-      await AsyncStorage.setItem("authToken", token); // Store JWT token
-      await AsyncStorage.setItem("userData", JSON.stringify(user)); // Store user data for session persistence
+      if (response.data.success) {
+        const { token, user } = response.data;
+        
+        await AsyncStorage.setItem("authToken", token);
+        await AsyncStorage.setItem("userData", JSON.stringify(user));
 
-      setEmail("");
-      setPassword("");
-      navigation.replace("Home"); // Redirect to Home Screen after successful login
+        setFormData({ email: "", password: "" });
+        navigation.replace("Main");
+      }
     } catch (error) {
       const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
-      Alert.alert("Login Error", errorMessage);
+      
+      if (error.response?.data?.message?.includes("verify") || 
+          error.response?.data?.message?.includes("not verified")) {
+        Alert.alert(
+          "Email Not Verified",
+          "Please verify your email before logging in.",
+          [
+            {
+              text: "Verify Now",
+              onPress: () => {
+                navigation.navigate("OTPVerification", {
+                  email: formData.email.trim(),
+                  fullName: "User",
+                });
+              },
+            },
+            { text: "Cancel", style: "cancel" },
+          ]
+        );
+      } else {
+        Alert.alert("Login Error", errorMessage);
+      }
     } finally {
-      setLoading(false);
+      setUiState(prev => ({ ...prev, isLoading: false }));
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.keyboardView}
-      >
-        <View style={styles.logoContainer}>
-          <Image
-            style={styles.logo}
-            source={require("../../assets/Login.png")} // Your logo image
-            resizeMode="contain"
-          />
-        </View>
+      <LinearGradient colors={[COLORS.background, COLORS.white]} style={styles.gradient}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.keyboardView}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.header}>
+              <View style={styles.logoContainer}>
+                <MaterialCommunityIcons name="bus-multiple" size={60} color="#F96E2A" />
+              </View>
+              <Text style={styles.title}>Welcome Back!</Text>
+              <Text style={styles.subtitle}>Sign in to continue your journey</Text>
+            </View>
 
-        <View style={styles.formContainer}>
-          <Text style={styles.headerText}>Login to your Account</Text>
-
-          <View style={styles.inputContainer}>
-            <View style={styles.inputWrapper}>
-              <MaterialIcons
-                style={styles.inputIcon}
-                name="email"
-                size={24}
-                color="gray"
-              />
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                style={styles.input}
-                placeholder="Enter your Email"
+            <View style={styles.formSection}>
+              <InputField
+                iconType="MaterialIcons"
+                iconName="email"
+                placeholder="Email"
+                value={formData.email}
+                onChangeText={value => handleInputChange('email', value)}
                 keyboardType="email-address"
-                autoCapitalize="none"
+                fieldName="email"
+                uiState={uiState}
+                setUiState={setUiState}
+                editable={!uiState.isLoading}
               />
+              
+              <InputField
+                iconType="AntDesign"
+                iconName="lock1"
+                placeholder="Password"
+                value={formData.password}
+                onChangeText={value => handleInputChange('password', value)}
+                secureTextEntry={true}
+                fieldName="password"
+                uiState={uiState}
+                setUiState={setUiState}
+                editable={!uiState.isLoading}
+              />
+
+              <TouchableOpacity
+                onPress={handleLogin}
+                style={[styles.loginButton, uiState.isLoading && styles.loginButtonDisabled]}
+                disabled={uiState.isLoading}
+                activeOpacity={0.8}
+              >
+                {uiState.isLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.loginButtonText}>Sign In</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.registerSection}>
+                <Text style={styles.registerPrompt}>Don't have an account? </Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate("Register")}
+                  disabled={uiState.isLoading}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.registerLink}>Sign Up</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            <View style={styles.inputWrapper}>
-              <AntDesign
-                name="lock1"
-                size={24}
-                color="gray"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                style={styles.input}
-                placeholder="Enter your Password"
-                secureTextEntry
-              />
-            </View>
-          </View>
-
-          <View style={styles.optionsContainer}>
-            <Text style={styles.keepLoggedText}>Keep me logged in</Text>
-            <Pressable onPress={() => navigation.navigate("ForgotPassword")}>
-              <Text style={styles.forgotText}>Forgot Password?</Text>
-            </Pressable>
-          </View>
-
-          <Pressable
-            onPress={handleLogin}
-            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.loginButtonText}>Login</Text>
-            )}
-          </Pressable>
-
-          <Pressable
-            onPress={() => navigation.navigate("Register")}
-            style={styles.registerLink}
-          >
-            <Text style={styles.registerText}>
-              Don't have an account? Sign Up
-            </Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "white",
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.background 
   },
-  keyboardView: {
-    flex: 1,
-    alignItems: "center",
-    paddingHorizontal: 20,
+  gradient: { 
+    flex: 1 
+  },
+  keyboardView: { 
+    flex: 1 
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
+  header: {
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 60,
   },
   logoContainer: {
-    marginTop: Platform.OS === "ios" ? 60 : 40,
-    alignItems: "center",
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  logo: {
-    width: width * 0.4,
-    height: width * 0.27,
+  title: {
+    fontSize: fontSizes.xxl,
+    fontWeight: '700',
+    color: COLORS.primary,
+    marginBottom: 8,
   },
-  formContainer: {
-    width: "100%",
-    maxWidth: 400,
-    alignSelf: "center",
-    marginTop: 30,
+  subtitle: {
+    fontSize: fontSizes.md,
+    color: COLORS.muted,
+    fontWeight: '400',
+    textAlign: 'center',
   },
-  headerText: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#041E42",
-    textAlign: "center",
-    marginBottom: 30,
+  formSection: { 
+    flex: 1 
   },
-  inputContainer: {
-    gap: 15,
+  inputGroup: { 
+    marginBottom: 18 
   },
   inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: 8,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#E5E7EB",
   },
-  inputIcon: {
-    marginLeft: 12,
+  inputWrapperError: {
+    borderColor: COLORS.error,
+    borderWidth: 1.5,
+  },
+  iconContainer: { 
+    marginRight: 12 
   },
   input: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    fontSize: 16,
-    color: "#333",
+    fontSize: fontSizes.md,
+    color: COLORS.text,
+    fontWeight: '400',
   },
-  optionsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 15,
+  eyeIcon: { 
+    padding: 4 
   },
-  keepLoggedText: {
-    color: "#666",
-  },
-  forgotText: {
-    color: "#007FFF",
-    fontWeight: "500",
+  errorText: {
+    color: COLORS.error,
+    fontSize: fontSizes.sm,
+    marginTop: 4,
+    marginLeft: 4,
+    fontWeight: '500',
   },
   loginButton: {
-    backgroundColor: "#2E5077",
-    borderRadius: 8,
-    padding: 15,
-    marginTop: 30,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 18,
   },
   loginButtonDisabled: {
-    opacity: 0.7,
+    backgroundColor: COLORS.muted,
   },
   loginButtonText: {
-    textAlign: "center",
-    color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+    color: "#fff",
+    fontSize: fontSizes.md,
+    fontWeight: "700",
+  },
+  registerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  registerPrompt: {
+    color: COLORS.muted,
+    fontSize: fontSizes.md,
   },
   registerLink: {
-    marginTop: 20,
-  },
-  registerText: {
-    textAlign: "center",
-    color: "#666",
-    fontSize: 16,
+    color: COLORS.accent,
+    fontSize: fontSizes.md,
+    fontWeight: '600',
   },
 });
 
