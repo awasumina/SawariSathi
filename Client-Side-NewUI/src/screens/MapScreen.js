@@ -24,15 +24,12 @@ export default function MapScreen({ route, navigation }) {
   const fetchedRef = useRef(false);
   const mapRef = useRef(null);
 
-  // Define colors for different route segments
-  const segmentColors = [
-    '#4CAF50', // Green
-    '#FF9800', // Orange
-    '#2196F3', // Blue
-    '#E91E63', // Pink
-    '#9C27B0', // Purple
-    '#00BCD4', // Cyan
-  ];
+  // Define colors for route segments
+  const ROUTE_COLORS = {
+    completeRoute: '#9E9E9E', // Gray for complete bus route (C to D)
+    userJourney: colors.primary, // Orange/Primary for user's journey (A to B)
+    walking: '#FF6B6B', // Red for walking paths
+  };
 
   // Default values in case route.params is undefined
   const stops = route.params?.stops || [];
@@ -46,13 +43,18 @@ export default function MapScreen({ route, navigation }) {
   const fromCoordinates = route.params?.fromCoordinates || null;
   const toCoordinates = route.params?.toCoordinates || null;
 
+  // User journey segment indices (A to B within complete route C to D)
+  const userJourneyFromIndex = route.params?.userJourneyFromIndex ?? 0;
+  const userJourneyToIndex = route.params?.userJourneyToIndex ?? (stops.length - 1);
+
   // Debug: Log what coordinates were received
-  console.log('🗺️ MapScreen received coordinates:', {
+  console.log('🗺️ MapScreen received:', {
     hasFromCoordinates: !!fromCoordinates,
     hasToCoordinates: !!toCoordinates,
-    fromCoordinates,
-    toCoordinates,
-    stopsCount: stops.length
+    stopsCount: stops.length,
+    userJourneyFromIndex,
+    userJourneyToIndex,
+    isMultiLeg
   });
   
   // Convert received stops to proper format
@@ -83,46 +85,34 @@ export default function MapScreen({ route, navigation }) {
   // Find transfer stop if it exists
   const transferStopCoord = allStops.find(stop => stop.isTransfer);
 
-  // Function to detect duplicate stops and split into segments
-  const splitIntoSegments = (stops) => {
-    if (stops.length < 2) return [];
+  // Split route into segments: before user journey, user journey, after user journey
+  const splitRouteIntoJourneySegments = (stops, fromIdx, toIdx) => {
+    if (stops.length < 2) return { beforeJourney: [], userJourney: [], afterJourney: [] };
 
-    const segments = [];
-    let currentSegment = [stops[0]];
+    const safeFromIdx = Math.max(0, Math.min(fromIdx, stops.length - 1));
+    const safeToIdx = Math.max(0, Math.min(toIdx, stops.length - 1));
 
-    for (let i = 1; i < stops.length; i++) {
-      currentSegment.push(stops[i]);
+    // Segment before user journey (route start C to user's start A)
+    const beforeJourney = safeFromIdx > 0 ? stops.slice(0, safeFromIdx + 1) : [];
 
-      // Check if current stop is duplicate (appears again later or was seen before)
-      const isDuplicate = stops.slice(i + 1).some(
-        s => s.name === stops[i].name &&
-             s.latitude === stops[i].latitude &&
-             s.longitude === stops[i].longitude
-      );
+    // User's journey segment (A to B)
+    const userJourney = stops.slice(safeFromIdx, safeToIdx + 1);
 
-      // If duplicate found or this is the last stop, save the segment
-      if (isDuplicate || i === stops.length - 1) {
-        if (currentSegment.length >= 2) {
-          segments.push([...currentSegment]);
-        }
+    // Segment after user journey (user's end B to route end D)
+    const afterJourney = safeToIdx < stops.length - 1 ? stops.slice(safeToIdx) : [];
 
-        // Start new segment from the duplicate stop (transfer point)
-        if (isDuplicate && i < stops.length - 1) {
-          currentSegment = [stops[i]]; // Include duplicate as start of next segment
-        }
-      }
-    }
-
-    return segments;
+    return { beforeJourney, userJourney, afterJourney };
   };
 
   console.log('🔍 All Stops:', allStops.map(s => s.name));
-  const stopsSegments = splitIntoSegments(allStops);
-  console.log('📍 Detected Segments:', stopsSegments.map((seg, i) => ({
-    segment: i + 1,
-    stops: seg.map(s => s.name),
-    color: segmentColors[i % segmentColors.length]
-  })));
+
+  // Get journey segments for highlighting
+  const journeySegments = splitRouteIntoJourneySegments(allStops, userJourneyFromIndex, userJourneyToIndex);
+  console.log('📍 Route Segments:', {
+    beforeJourney: journeySegments.beforeJourney.map(s => s.name),
+    userJourney: journeySegments.userJourney.map(s => s.name),
+    afterJourney: journeySegments.afterJourney.map(s => s.name),
+  });
 
   useEffect(() => {
     // Prevent multiple fetches for the same route
@@ -135,56 +125,63 @@ export default function MapScreen({ route, navigation }) {
       setError(null);
 
       try {
-        // Fetch walking path from origin to first bus stop if coordinates provided
-        if (fromCoordinates && allStops.length > 0) {
+        // Fetch walking path from origin to user's boarding stop (A) if coordinates provided
+        if (fromCoordinates && journeySegments.userJourney.length > 0) {
+          const userBoardingStop = journeySegments.userJourney[0];
           console.log('🎯 Origin coordinates detected:', fromCoordinates);
-          console.log('🚶 Fetching walking path from origin to first stop...');
+          console.log('🚶 Fetching walking path from origin to boarding stop...');
           await fetchWalkingRoute(
             { latitude: fromCoordinates.latitude, longitude: fromCoordinates.longitude },
-            allStops[0],
+            userBoardingStop,
             setWalkingToStartCoords
           );
-        } else {
-          console.log('ℹ️ No origin coordinates for walking path:', { fromCoordinates, stopsCount: allStops.length });
         }
 
-        // Fetch routes for each segment with different colors
-        if (stopsSegments.length > 0) {
-          const segmentsData = [];
+        const segmentsData = [];
 
-          for (let i = 0; i < stopsSegments.length; i++) {
-            const segment = stopsSegments[i];
-            const color = segmentColors[i % segmentColors.length];
-
-            console.log(`🚌 Fetching segment ${i + 1}/${stopsSegments.length}:`, segment.map(s => s.name).join(' → '));
-
-            const coords = await fetchRouteForSegment(segment);
-            if (coords && coords.length > 0) {
-              segmentsData.push({ coords, color });
-              console.log(`✅ Segment ${i + 1} fetched: ${coords.length} points, color: ${color}`);
-            }
+        // Fetch route BEFORE user journey (C to A) - Gray color
+        if (journeySegments.beforeJourney.length >= 2) {
+          console.log('🚌 Fetching BEFORE journey segment (gray):',
+            journeySegments.beforeJourney.map(s => s.name).join(' → '));
+          const coords = await fetchRouteForSegment(journeySegments.beforeJourney);
+          if (coords && coords.length > 0) {
+            segmentsData.push({ coords, color: ROUTE_COLORS.completeRoute, type: 'before' });
           }
-
-          setRouteSegments(segmentsData);
-          console.log(`📊 Total segments displayed: ${segmentsData.length}`);
         }
 
-        // Fetch walking path from last bus stop to destination if coordinates provided
-        if (toCoordinates && allStops.length > 0) {
-          const lastStop = allStops[allStops.length - 1];
+        // Fetch USER JOURNEY route (A to B) - Highlighted color
+        if (journeySegments.userJourney.length >= 2) {
+          console.log('🚌 Fetching USER JOURNEY segment (highlighted):',
+            journeySegments.userJourney.map(s => s.name).join(' → '));
+          const coords = await fetchRouteForSegment(journeySegments.userJourney);
+          if (coords && coords.length > 0) {
+            segmentsData.push({ coords, color: ROUTE_COLORS.userJourney, type: 'userJourney' });
+          }
+        }
 
+        // Fetch route AFTER user journey (B to D) - Gray color
+        if (journeySegments.afterJourney.length >= 2) {
+          console.log('🚌 Fetching AFTER journey segment (gray):',
+            journeySegments.afterJourney.map(s => s.name).join(' → '));
+          const coords = await fetchRouteForSegment(journeySegments.afterJourney);
+          if (coords && coords.length > 0) {
+            segmentsData.push({ coords, color: ROUTE_COLORS.completeRoute, type: 'after' });
+          }
+        }
+
+        setRouteSegments(segmentsData);
+        console.log(`📊 Total segments displayed: ${segmentsData.length}`);
+
+        // Fetch walking path from user's alighting stop (B) to destination if coordinates provided
+        if (toCoordinates && journeySegments.userJourney.length > 0) {
+          const userAlightingStop = journeySegments.userJourney[journeySegments.userJourney.length - 1];
           console.log('🎯 Destination coordinates detected:', toCoordinates);
-          console.log('🚶 Fetching walking path from last stop to destination...');
-
-          if (lastStop) {
-            await fetchWalkingRoute(
-              lastStop,
-              { latitude: toCoordinates.latitude, longitude: toCoordinates.longitude },
-              setWalkingFromEndCoords
-            );
-          }
-        } else {
-          console.log('ℹ️ No destination coordinates for walking path:', { toCoordinates, stopsCount: allStops.length });
+          console.log('🚶 Fetching walking path from alighting stop to destination...');
+          await fetchWalkingRoute(
+            userAlightingStop,
+            { latitude: toCoordinates.latitude, longitude: toCoordinates.longitude },
+            setWalkingFromEndCoords
+          );
         }
 
         fetchedRef.current = true; // Mark that we've fetched for this route
@@ -197,7 +194,7 @@ export default function MapScreen({ route, navigation }) {
     };
 
     getRoutes();
-  }, [JSON.stringify(allStops)]);
+  }, [JSON.stringify(allStops), userJourneyFromIndex, userJourneyToIndex]);
 
   // Reset the fetch ref when route params change
   useEffect(() => {
@@ -425,8 +422,11 @@ export default function MapScreen({ route, navigation }) {
 
         {/* Bus Stop Markers */}
         {allStops.map((stop, i) => {
-          const isFirstStop = i === 0;
-          const isLastStop = i === allStops.length - 1;
+          const isRouteStart = i === 0; // Route start (C)
+          const isRouteEnd = i === allStops.length - 1; // Route end (D)
+          const isUserBoardingStop = i === userJourneyFromIndex; // User boards here (A)
+          const isUserAlightingStop = i === userJourneyToIndex; // User alights here (B)
+          const isOnUserJourney = i >= userJourneyFromIndex && i <= userJourneyToIndex;
 
           // Check if this stop is a transfer point (appears multiple times)
           const occurrences = allStops.filter(
@@ -436,6 +436,14 @@ export default function MapScreen({ route, navigation }) {
           ).length;
           const isTransferStop = occurrences > 1 || stop.isTransfer;
 
+          // Determine marker description
+          let description = `Stop ${i + 1}`;
+          if (isUserBoardingStop) description = '🚌 Board Here (Your Start)';
+          else if (isUserAlightingStop) description = '🚌 Alight Here (Your Destination)';
+          else if (isRouteStart) description = '🚏 Route Start';
+          else if (isRouteEnd) description = '🚏 Route End';
+          else if (isTransferStop) description = '🔄 Transfer Point';
+
           return (
             <Marker
               key={`stop-${i}-${stop.latitude}-${stop.longitude}`}
@@ -444,20 +452,32 @@ export default function MapScreen({ route, navigation }) {
                 longitude: stop.longitude,
               }}
               title={stop.name}
-              description={isTransferStop ? '🔄 Transfer Point - Change Bus Here' : `Stop ${i + 1}`}
+              description={description}
             >
               <View style={styles.markerContainer}>
-                {isFirstStop ? (
+                {isUserBoardingStop ? (
+                  <MaterialCommunityIcons
+                    name="bus-stop"
+                    size={28}
+                    color={colors.primary}
+                  />
+                ) : isUserAlightingStop ? (
+                  <MaterialCommunityIcons
+                    name="bus-stop-covered"
+                    size={28}
+                    color={colors.primary}
+                  />
+                ) : isRouteStart ? (
                   <MaterialCommunityIcons
                     name="flag"
-                    size={28}
-                    color="#4CAF50"
+                    size={24}
+                    color="#9E9E9E"
                   />
-                ) : isLastStop ? (
+                ) : isRouteEnd ? (
                   <MaterialCommunityIcons
                     name="flag-checkered"
-                    size={28}
-                    color="#FF5722"
+                    size={24}
+                    color="#9E9E9E"
                   />
                 ) : isTransferStop ? (
                   <MaterialCommunityIcons
@@ -465,8 +485,10 @@ export default function MapScreen({ route, navigation }) {
                     size={28}
                     color="#FF9800"
                   />
+                ) : isOnUserJourney ? (
+                  <View style={[styles.stopMarker, { backgroundColor: colors.primary }]} />
                 ) : (
-                  <View style={styles.stopMarker} />
+                  <View style={[styles.stopMarker, { backgroundColor: '#BDBDBD' }]} />
                 )}
               </View>
             </Marker>
@@ -538,61 +560,44 @@ export default function MapScreen({ route, navigation }) {
         </View>
       </View>
 
+      {/* Route Legend */}
       {allStops.length > 0 && (
-        <View style={styles.legend}>
-          {walkingToStartCoords.length > 0 && (
+        <View style={styles.routeLegend}>
+          {/* Walking legend item */}
+          {(walkingToStartCoords.length > 0 || walkingFromEndCoords.length > 0) && (
             <View style={styles.legendItem}>
-              <View style={[styles.legendLine, { backgroundColor: '#FF6B6B', borderStyle: 'dashed' }]} />
+              <View style={styles.lineExample}>
+                <View style={[styles.lineColor, { backgroundColor: ROUTE_COLORS.walking }]} />
+              </View>
               <Text style={styles.legendText}>Walking</Text>
             </View>
           )}
 
-          {routeSegments.map((segment, index) => (
-            <View key={`legend-${index}`} style={styles.legendItem}>
-              <View style={[styles.legendLine, { backgroundColor: segment.color }]} />
-              <Text style={styles.legendText}>Bus {index + 1}</Text>
+          {/* User Journey (highlighted) */}
+          <View style={styles.legendItem}>
+            <View style={styles.lineExample}>
+              <View style={[styles.lineColor, { backgroundColor: ROUTE_COLORS.userJourney }]} />
             </View>
-          ))}
+            <Text style={styles.legendText}>Your Journey</Text>
+          </View>
 
-          {stopsSegments.length > 1 && (
+          {/* Complete Route (gray) - show only if there are segments before/after user journey */}
+          {(journeySegments.beforeJourney.length >= 2 || journeySegments.afterJourney.length >= 2) && (
             <View style={styles.legendItem}>
-              <MaterialCommunityIcons
-                name="transfer"
-                size={16}
-                color="#FF9800"
-              />
-              <Text style={styles.legendText}>Transfer</Text>
+              <View style={styles.lineExample}>
+                <View style={[styles.lineColor, { backgroundColor: ROUTE_COLORS.completeRoute }]} />
+              </View>
+              <Text style={styles.legendText}>Full Route</Text>
             </View>
           )}
+
+          {/* Boarding/Alighting markers */}
+          <View style={styles.legendItem}>
+            <MaterialCommunityIcons name="bus-stop" size={16} color={colors.primary} />
+            <Text style={styles.legendText}>Board/Alight</Text>
+          </View>
         </View>
       )}
-
-      <View style={styles.routeLegend}>
-        {(walkingToStartCoords.length > 0 || walkingFromEndCoords.length > 0) && (
-          <View style={styles.legendItem}>
-            <View style={styles.lineExample}>
-              <View style={[styles.lineColor, { backgroundColor: '#FF6B6B' }]} />
-            </View>
-            <Text style={styles.legendText}>Walking</Text>
-          </View>
-        )}
-
-        <View style={styles.legendItem}>
-          <View style={styles.lineExample}>
-            <View style={[styles.lineColor, { backgroundColor: colors.primary }]} />
-          </View>
-          <Text style={styles.legendText}>{isMultiLeg ? 'First Bus' : 'Bus Route'}</Text>
-        </View>
-
-        {isMultiLeg && (
-          <View style={styles.legendItem}>
-            <View style={styles.lineExample}>
-              <View style={[styles.lineColor, { backgroundColor: colors.accent }]} />
-            </View>
-            <Text style={styles.legendText}>Second Bus</Text>
-          </View>
-        )}
-      </View>
 
       <TouchableOpacity
         style={styles.fitToMarkersButton}

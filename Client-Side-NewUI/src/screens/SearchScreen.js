@@ -1016,7 +1016,7 @@ const SearchScreen = ({ navigation, route }) => {
                                         />
                                     )}
                                     <Text style={[styles.toggleText, useCurrentLocation && styles.toggleTextActive]}>
-                                        Use GPS
+                                        My Location
                                     </Text>
                                 </TouchableOpacity>
                             </View>

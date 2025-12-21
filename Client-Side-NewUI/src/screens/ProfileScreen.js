@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,15 +9,78 @@ import {
   Image,
   Platform,
   StatusBar,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, CommonActions } from '@react-navigation/native';
+import { getData, removeData } from '../utils/storage';
+
+const AUTH_TOKEN_KEY = 'authToken';
+const USER_DATA_KEY = 'userData';
 
 const ProfileScreen = () => {
-  const profileData = {
-    name: 'John Doe',
-    email: 'john.doe@example.com',
-    phone: '+977 9812345678',
-    studentId: 'STU123456',
+  const navigation = useNavigation();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [userData, setUserData] = useState(null);
+
+  // Load user data on mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      const storedUserData = await getData(USER_DATA_KEY);
+      if (storedUserData) {
+        setUserData(storedUserData);
+      }
+    };
+    loadUserData();
+  }, []);
+
+  // Fallback profile data if no user data is stored
+  const profileData = userData || {
+    fullName: 'Guest User',
+    email: 'guest@example.com',
+    phoneNumber: null,
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: performLogout,
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const performLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      // Clear all auth-related data from storage
+      await removeData(AUTH_TOKEN_KEY);
+      await removeData(USER_DATA_KEY);
+
+      // Reset navigation state and navigate to Login
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        })
+      );
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Error', 'Failed to logout. Please try again.');
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const menuItems = [
@@ -48,8 +111,8 @@ const ProfileScreen = () => {
               <Ionicons name="camera" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
-          <Text style={styles.profileName}>{profileData.name}</Text>
-          <Text style={styles.profileEmail}>{profileData.email}</Text>
+          <Text style={styles.profileName}>{profileData.fullName || 'Guest User'}</Text>
+          <Text style={styles.profileEmail}>{profileData.email || 'No email'}</Text>
           <View style={styles.verifiedBadge}>
             <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
             <Text style={styles.verifiedText}>Verified Student</Text>
@@ -81,9 +144,19 @@ const ProfileScreen = () => {
         </View>
 
         {/* Logout Button */}
-        <TouchableOpacity style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          disabled={isLoggingOut}
+        >
+          {isLoggingOut ? (
+            <ActivityIndicator size="small" color="#FF3B30" />
+          ) : (
+            <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+          )}
+          <Text style={styles.logoutText}>
+            {isLoggingOut ? 'Logging out...' : 'Logout'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

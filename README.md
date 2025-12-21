@@ -9,9 +9,11 @@
 6. [Route Calculation](#route-calculation)
 7. [Map Visualization](#map-visualization)
 8. [Multi-Color Route Segments](#multi-color-route-segments)
-9. [API Endpoints](#api-endpoints)
-10. [Frontend Components](#frontend-components)
-11. [Troubleshooting](#troubleshooting)
+9. [User Authentication](#user-authentication)
+10. [API Endpoints](#api-endpoints)
+11. [Frontend Components](#frontend-components)
+12. [Recent Updates](#recent-updates)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -25,6 +27,11 @@ The Sawari Sathi app provides a comprehensive public transport routing system th
 - **Walking path visualization**: Complete door-to-door journey display
 - **Multi-leg journeys**: Routes requiring transfers between buses
 - **Color-coded segments**: Visual distinction between different buses
+- **User authentication**: Secure login/registration with email OTP verification
+- **Student fare support**: Discounted fares for verified students
+- **Complete route visualization**: View full bus route with user journey highlighted
+- **Favorites & Recent searches**: Save and quickly access frequent routes
+- **My Location**: Use GPS to set current location as origin
 
 ---
 
@@ -783,6 +790,48 @@ useEffect(() => {
 
 ---
 
+## Complete Route vs User Journey Visualization
+
+### Overview
+
+The map now displays two distinct route types:
+1. **Complete Bus Route (C to D)**: The full route the bus travels, shown in gray
+2. **User's Journey (A to B)**: The portion of the route the user will travel, highlighted in orange/primary color
+
+### Color Scheme
+
+```javascript
+const ROUTE_COLORS = {
+    completeRoute: '#9E9E9E', // Gray for complete bus route
+    userJourney: colors.primary, // Orange for user's journey
+    walking: '#FF6B6B', // Red for walking paths
+};
+```
+
+### Route Segment Splitting
+
+The route is split into three segments based on user's boarding and alighting points:
+
+```javascript
+const splitRouteIntoJourneySegments = (allStops, fromIndex, toIndex) => {
+    return {
+        beforeJourney: allStops.slice(0, fromIndex + 1),  // Before user boards
+        userJourney: allStops.slice(fromIndex, toIndex + 1),  // User's travel
+        afterJourney: allStops.slice(toIndex)  // After user alights
+    };
+};
+```
+
+### Map Legend
+
+The map includes a legend showing:
+- **Your Journey** (Orange): The portion you'll travel
+- **Full Route** (Gray): Complete bus route
+- **Board/Alight** (Markers): Your boarding and alighting stops
+- **Walking** (Red dashed): Walking paths to/from stops
+
+---
+
 ## Multi-Color Route Segments
 
 ### Duplicate Stop Detection
@@ -866,6 +915,73 @@ Segment 2 (Orange): [Stop 3, Stop 4, Stop 5]
 Stop 1   Stop 2  Stop 3    Stop 4  Stop 5
     Green Path        Orange Path
 ```
+
+---
+
+## User Authentication
+
+### Overview
+
+The app includes a complete authentication system with:
+- Email/password registration
+- Email OTP verification
+- Secure login with JWT tokens
+- Profile management with logout functionality
+
+### Registration Flow
+
+```
+1. User enters email, password, full name
+2. Backend creates unverified account
+3. OTP sent to email
+4. User enters OTP to verify account
+5. Account activated, user can login
+```
+
+### Login Flow
+
+```javascript
+// LoginScreen.js - handleLogin
+const handleLogin = async () => {
+    const response = await axios.post(`${AUTH_API_BASE_URL}/login`, {
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password
+    });
+
+    if (response.data.success) {
+        const { token, user } = response.data;
+        await AsyncStorage.setItem("authToken", token);
+        await AsyncStorage.setItem("userData", JSON.stringify(user));
+        navigation.replace("Main");
+    }
+};
+```
+
+### Logout Functionality
+
+```javascript
+// ProfileScreen.js - performLogout
+const performLogout = async () => {
+    // Clear all auth-related data from storage
+    await removeData(AUTH_TOKEN_KEY);  // 'authToken'
+    await removeData(USER_DATA_KEY);   // 'userData'
+
+    // Reset navigation state and navigate to Login
+    navigation.dispatch(
+        CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+        })
+    );
+};
+```
+
+### Authentication Storage Keys
+
+| Key | Description |
+|-----|-------------|
+| `authToken` | JWT token for API authentication |
+| `userData` | User profile data (name, email, etc.) |
 
 ---
 
@@ -1080,6 +1196,56 @@ const filteredStops = stops.slice(
 
 ---
 
+## Recent Updates
+
+### Version 2.1 (December 2025)
+
+#### New Features
+
+1. **Complete Route Visualization on Map**
+   - Map now shows the complete bus route (C to D) in gray
+   - User's journey (A to B) is highlighted in orange/primary color
+   - Clear visual distinction between full route and user's travel segment
+   - Updated legend with "Your Journey" and "Full Route" labels
+
+2. **Logout Functionality**
+   - Added logout button in Profile screen
+   - Confirmation dialog before logout
+   - Clears authentication tokens and user data
+   - Resets navigation to Login screen
+
+3. **Improved Student Fare Display**
+   - Student fare now displayed as separate item with school icon
+   - Green color scheme for student fare section
+   - More visible and clearly labeled discount information
+
+4. **"My Location" GPS Toggle**
+   - Renamed from "Use GPS" to "My Location" for clarity
+   - Toggle to use current GPS location as origin
+   - More intuitive labeling for better UX
+
+#### Bug Fixes
+
+1. **Route Stops Filtering**
+   - Fixed issue where Route Stops section showed complete journey instead of user's filtered stops
+   - Stop ID now properly preserved in data transformation
+   - Correct filtering based on fromStopId and toStopId
+
+2. **Stop ID Preservation**
+   - Added `id: stop.id` to safeTransport stops mapping
+   - Ensures proper ID matching for filtering logic
+
+#### Code Changes
+
+| File | Changes |
+|------|---------|
+| `MapScreen.js` | Added ROUTE_COLORS, splitRouteIntoJourneySegments(), updated legend |
+| `ProfileScreen.js` | Added logout functionality with confirmation dialog |
+| `VehicleDetails.js` | Improved student fare display, fixed stop ID preservation |
+| `SearchScreen.js` | Renamed "Use GPS" to "My Location" |
+
+---
+
 ## Troubleshooting
 
 ### Issue 1: Empty Stops List in Bus Details
@@ -1278,6 +1444,6 @@ lat:27.696655,lon:85.305717  (has labels)
 
 ---
 
-**Last Updated:** November 2025
-**Version:** 2.0
+**Last Updated:** December 2025
+**Version:** 2.1
 **Maintainer:** Sawari Sathi Development Team

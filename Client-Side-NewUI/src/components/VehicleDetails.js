@@ -39,6 +39,7 @@ const VehicleDetails = ({ route, navigation }) => {
         count: transport?.vehicle?.count || 'N/A',
       },
       stops: transport?.stops?.map(stop => ({
+        id: stop.id, // Preserve stop ID for matching
         name: stop.stops_name || stop.name || 'Unknown Stop',
         stops_name: stop.stops_name || stop.name || 'Unknown Stop', // Add both formats
         lat: parseFloat(stop.stops_lat || stop.lat) || 0,
@@ -65,6 +66,9 @@ const VehicleDetails = ({ route, navigation }) => {
       // Include from/to in the saved object
       fromLocation: fromLocation,
       toLocation: toLocation,
+      // Store stop IDs for user journey segment identification
+      fromStopId: transport?.fromStopId || null,
+      toStopId: transport?.toStopId || null,
     };
     
     console.log("SafeTransport processed:", result);
@@ -123,16 +127,49 @@ const VehicleDetails = ({ route, navigation }) => {
       return;
     }
 
+    // Calculate user journey indices for highlighting on map
+    let userJourneyFromIndex = -1;
+    let userJourneyToIndex = -1;
+
+    if (safeTransport.fromStopId && safeTransport.toStopId) {
+      userJourneyFromIndex = safeTransport.stops.findIndex(stop =>
+        stop.id == safeTransport.fromStopId
+      );
+      userJourneyToIndex = safeTransport.stops.findIndex(stop =>
+        stop.id == safeTransport.toStopId
+      );
+    }
+
+    // Fallback to name matching
+    if (userJourneyFromIndex === -1 || userJourneyToIndex === -1) {
+      userJourneyFromIndex = safeTransport.stops.findIndex(stop =>
+        stop.name === fromLocation || stop.stops_name === fromLocation
+      );
+      userJourneyToIndex = safeTransport.stops.findIndex(stop =>
+        stop.name === toLocation || stop.stops_name === toLocation
+      );
+    }
+
+    // Ensure correct order (start to end)
+    const startIdx = Math.min(userJourneyFromIndex, userJourneyToIndex);
+    const endIdx = Math.max(userJourneyFromIndex, userJourneyToIndex);
+
+    console.log('🗺️ Map params - Complete route:', safeTransport.stops.length, 'stops');
+    console.log('🗺️ User journey segment:', startIdx, 'to', endIdx);
+
     // Prepare navigation parameters
     const mapParams = {
-      stops: safeTransport.stops,
+      stops: safeTransport.stops, // Complete route (C to D)
       fromLocation,
       toLocation,
       routeInfo: {
         name: safeTransport.vehicle.name,
         type: safeTransport.vehicleType,
         number: safeTransport.routeNumber,
-      }
+      },
+      // User journey segment info (A to B)
+      userJourneyFromIndex: startIdx !== -1 ? startIdx : 0,
+      userJourneyToIndex: endIdx !== -1 ? endIdx : safeTransport.stops.length - 1,
     };
 
     // Add walking information if available (from location-based search)
@@ -366,13 +403,23 @@ const VehicleDetails = ({ route, navigation }) => {
               <View>
                 <Text style={styles.statValue}>
                   Rs. {safeTransport.isMultiLeg ? safeTransport.combinedFare : safeTransport.fare}
-                  {safeTransport.discountedFare && safeTransport.discountedFare !== safeTransport.fare && (
-                    <Text style={styles.discountText}> (Rs. {safeTransport.discountedFare})</Text>
-                  )}
                 </Text>
-                <Text style={styles.statLabel}>Fare</Text>
+                <Text style={styles.statLabel}>Regular Fare</Text>
               </View>
             </View>
+            {safeTransport.discountedFare && safeTransport.discountedFare !== safeTransport.fare && (
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons name="school" size={20} color="#2E7D32" style={styles.statIcon}/>
+                <View>
+                  <Text style={[styles.statValue, styles.studentFareValue]}>
+                    Rs. {safeTransport.discountedFare}
+                  </Text>
+                  <View style={styles.studentFareLabelContainer}>
+                    <Text style={styles.studentFareLabel}>Student Fare</Text>
+                  </View>
+                </View>
+              </View>
+            )}
             <View style={styles.statItem}>
               <MaterialCommunityIcons name="map-marker-distance" size={20} color={colors.primary} style={styles.statIcon}/>
               <View>
@@ -710,6 +757,18 @@ const styles = StyleSheet.create({
   discountText: {
     color: colors.secondaryText,
     fontSize: fontSizes.sm,
+  },
+  studentFareValue: {
+    color: '#2E7D32',
+  },
+  studentFareLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  studentFareLabel: {
+    color: '#2E7D32',
+    fontSize: fontSizes.sm,
+    fontWeight: '500',
   },
   routePathDisplay: {
     flexDirection: 'row',
