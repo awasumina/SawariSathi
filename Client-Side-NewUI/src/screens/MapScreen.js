@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   ActivityIndicator,
   StatusBar,
-  Dimensions,
 } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -378,6 +377,9 @@ export default function MapScreen({ route, navigation }) {
         style={styles.map}
         initialRegion={initialRegion}
         onMapReady={onMapReady}
+        showsUserLocation={true}
+        showsMyLocationButton={false}
+        mapType="standard"
       >
         {/* Home/Origin Marker */}
         {fromCoordinates && (
@@ -618,8 +620,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   map: {
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
   },
   header: {
     position: 'absolute',
