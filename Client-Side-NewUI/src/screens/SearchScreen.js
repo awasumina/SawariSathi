@@ -23,7 +23,6 @@ import { colors, spacing, fontSizes, borderRadius } from '../constants/theme';
 import { storeData, getData } from '../utils/storage'; // Import storage utils
 import { API_BASE_URL } from '../config/api';
 import { LocationService } from '../utils/locationService';
-// const API_BASE_URL = 'http://192.168.101.2:3000/api'; // Ensure correct IP
 const RECENT_SEARCHES_KEY = '@recent_searches';
 const MAX_RECENT_SEARCHES = 20;
 

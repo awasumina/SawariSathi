@@ -22,7 +22,6 @@ import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 
 const FAVORITES_KEY = '@favorites';
-// const API_BASE_URL = 'http://192.168.101.2:3000/api'; removed for single file imported above
 
 const getVehicleIconName = (type) => {
     switch (type?.toLowerCase()) {
