@@ -26,6 +26,7 @@ export default function MapScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [mapLayout, setMapLayout] = useState(null);
+  const [mapReady, setMapReady] = useState(false);
   const fetchedRef = useRef(false);
   const mapRef = useRef(null);
 
@@ -354,7 +355,9 @@ export default function MapScreen({ route, navigation }) {
 
   // Handle map layout ready
   const onMapReady = () => {
+    console.log('🗺️ Map is ready!');
     setMapLayout(true);
+    setMapReady(true);
     setTimeout(fitMapToMarkers, 500);
   };
 
@@ -385,16 +388,17 @@ export default function MapScreen({ route, navigation }) {
 
       <View style={styles.mapContainer}>
         <MapView
+          key={`map-${initialRegion.latitude}-${initialRegion.longitude}`}
           ref={mapRef}
           style={styles.map}
-          initialRegion={initialRegion}
+          region={initialRegion}
           onMapReady={onMapReady}
+          onLayout={() => console.log('🗺️ Map layout complete')}
           showsUserLocation={true}
           showsMyLocationButton={false}
           mapType="standard"
-          loadingEnabled={true}
-          loadingIndicatorColor={colors.primary}
-          loadingBackgroundColor={colors.background}
+          minZoomLevel={5}
+          maxZoomLevel={20}
         >
         {/* Home/Origin Marker */}
         {fromCoordinates && (
