@@ -38,7 +38,9 @@ export default function MapScreen({ route, navigation }) {
   const fromLocation = route.params?.fromLocation || 'Starting Point';
   const toLocation = route.params?.toLocation || 'Destination';
   const routeInfo = route.params?.routeInfo || {};
-  const isMultiLeg = route.params?.isMultiLeg || false;
+  const routeName = route.params?.routeName || routeInfo?.name || '';
+  const routeNo = route.params?.routeNo || '';
+  const paramIsMultiLeg = route.params?.isMultiLeg || false;
   const transferStop = route.params?.transferStop || null;
   const secondLegStops = route.params?.secondLegStops || [];
   const fromCoordinates = route.params?.fromCoordinates || null;
@@ -46,15 +48,79 @@ export default function MapScreen({ route, navigation }) {
   const userJourneyFromIndex = route.params?.userJourneyFromIndex ?? 0;
   const userJourneyToIndex = route.params?.userJourneyToIndex ?? (stops.length - 1);
 
+  // Log all stops for debugging
+  console.log('🛑 All stops received:', stops.map((s, i) => ({
+    index: i,
+    name: s.name || s.stops_name,
+    id: s.id || s.stops_id,
+    lat: s.lat || s.stops_lat,
+    lon: s.lon || s.stops_lon
+  })));
+
+  // Detect multi-leg route by checking:
+  // 1. Route name contains " → " (arrow separator)
+  // 2. Route number contains " → "
+  // 3. There's a duplicate stop (same coordinates appearing twice = transfer point)
+  const findDuplicateStopIndex = (stopsArray) => {
+    for (let i = 0; i < stopsArray.length - 1; i++) {
+      const stop = stopsArray[i];
+      const lat = parseFloat(stop.lat || stop.stops_lat || 0);
+      const lon = parseFloat(stop.lon || stop.stops_lon || 0);
+      const name = stop.name || stop.stops_name || '';
+
+      // Check if this stop appears again later
+      for (let j = i + 1; j < stopsArray.length; j++) {
+        const nextStop = stopsArray[j];
+        const nextLat = parseFloat(nextStop.lat || nextStop.stops_lat || 0);
+        const nextLon = parseFloat(nextStop.lon || nextStop.stops_lon || 0);
+        const nextName = nextStop.name || nextStop.stops_name || '';
+
+        // Same coordinates or same name = transfer point
+        if ((Math.abs(lat - nextLat) < 0.0001 && Math.abs(lon - nextLon) < 0.0001) || name === nextName) {
+          return { firstIndex: i, secondIndex: j, stopName: name };
+        }
+      }
+    }
+    return null;
+  };
+
+  const duplicateStop = findDuplicateStopIndex(stops);
+  const hasArrowInName = routeName.includes(' → ') || routeNo.includes(' → ');
+  const detectedMultiLeg = paramIsMultiLeg || hasArrowInName || duplicateStop !== null;
+  const isMultiLeg = detectedMultiLeg;
+
+  // Find the transfer point index
+  const transferPointIndex = duplicateStop ? duplicateStop.firstIndex : -1;
+  const transferPointName = duplicateStop ? duplicateStop.stopName : (transferStop?.stops_name || null);
+
+  console.log('🗺️ Multi-leg detection:', {
+    paramIsMultiLeg,
+    hasArrowInName,
+    routeName,
+    routeNo,
+    duplicateStop,
+    detectedMultiLeg,
+    isMultiLeg,
+    transferPointIndex,
+    transferPointName,
+    totalStops: stops.length,
+    secondLegStopsFromParams: secondLegStops.length
+  });
+
   // Convert stops to proper format with leg info
-  const convertedStops = stops.map((stop) => ({
-    latitude: parseFloat(stop.lat || stop.stops_lat || 0),
-    longitude: parseFloat(stop.lon || stop.stops_lon || 0),
-    name: stop.name || stop.stops_name || 'Stop',
-    isTransfer: transferStop ?
-      (stop.name === transferStop.stops_name || stop.stops_name === transferStop.stops_name) : false,
-    leg: 1 // First leg
-  }));
+  const convertedStops = stops.map((stop, index) => {
+    const isBeforeTransfer = transferPointIndex === -1 || index <= transferPointIndex;
+    const stopName = stop.name || stop.stops_name || 'Stop';
+
+    return {
+      latitude: parseFloat(stop.lat || stop.stops_lat || 0),
+      longitude: parseFloat(stop.lon || stop.stops_lon || 0),
+      name: stopName,
+      isTransfer: transferPointName ? stopName === transferPointName : false,
+      leg: isBeforeTransfer ? 1 : 2,
+      originalIndex: index
+    };
+  });
 
   const convertedSecondLegStops = secondLegStops.map((stop) => ({
     latitude: parseFloat(stop.lat || stop.stops_lat || 0),
@@ -65,20 +131,43 @@ export default function MapScreen({ route, navigation }) {
     leg: 2 // Second leg
   }));
 
-  // For multi-leg, keep stops separate to show different colors
-  const firstLegStops = convertedStops;
-  const secondLegStopsConverted = convertedSecondLegStops;
+  // For multi-leg detected from duplicate stops, split the stops into two legs
+  let firstLegStops = [];
+  let secondLegStopsConverted = [];
+
+  if (isMultiLeg && transferPointIndex >= 0 && secondLegStops.length === 0) {
+    // Split based on detected transfer point
+    firstLegStops = convertedStops.slice(0, transferPointIndex + 1);
+    secondLegStopsConverted = convertedStops.slice(transferPointIndex).map(s => ({ ...s, leg: 2 }));
+    console.log('🚌 Split route at transfer point:', {
+      firstLegCount: firstLegStops.length,
+      secondLegCount: secondLegStopsConverted.length,
+      transferAt: firstLegStops[firstLegStops.length - 1]?.name
+    });
+  } else if (isMultiLeg && secondLegStops.length > 0) {
+    // Use provided second leg stops
+    firstLegStops = convertedStops;
+    secondLegStopsConverted = convertedSecondLegStops;
+    console.log('🚌 Using provided second leg stops:', {
+      firstLegCount: firstLegStops.length,
+      secondLegCount: secondLegStopsConverted.length
+    });
+  } else {
+    firstLegStops = convertedStops;
+    secondLegStopsConverted = convertedSecondLegStops;
+    console.log('🚌 Single leg route:', { stopsCount: firstLegStops.length });
+  }
 
   // Combined stops for markers (avoid duplicates at transfer point)
-  const allStops = isMultiLeg ?
-    [...convertedStops, ...convertedSecondLegStops.filter(stop =>
-      !convertedStops.some(s => s.latitude === stop.latitude && s.longitude === stop.longitude)
+  const allStops = isMultiLeg && secondLegStopsConverted.length > 0 ?
+    [...firstLegStops, ...secondLegStopsConverted.filter(stop =>
+      !firstLegStops.some(s => s.latitude === stop.latitude && s.longitude === stop.longitude)
     )] :
     convertedStops;
 
-  // Find transfer stop index
-  const transferStopIndex = allStops.findIndex(stop => stop.isTransfer);
-  const transferStopCoord = allStops.find(stop => stop.isTransfer);
+  // Find transfer stop index and coordinate
+  const transferStopIndex = transferPointIndex >= 0 ? transferPointIndex : allStops.findIndex(stop => stop.isTransfer);
+  const transferStopCoord = transferPointIndex >= 0 ? firstLegStops[transferPointIndex] : allStops.find(stop => stop.isTransfer);
 
   // Filter valid stops
   const validStops = allStops.filter(stop => stop.latitude !== 0 && stop.longitude !== 0);
@@ -113,6 +202,13 @@ export default function MapScreen({ route, navigation }) {
 
         if (isMultiLeg) {
           // MULTI-LEG ROUTE: Show each leg in different color
+          console.log('🎨 Drawing multi-leg route:', {
+            firstLegStopsCount: firstLegStops.length,
+            secondLegStopsCount: secondLegStopsConverted.length,
+            userJourneyFromIndex,
+            userJourneyToIndex,
+            transferStopIndex
+          });
 
           // First leg - before user journey (gray)
           if (userJourneyFromIndex > 0 && firstLegStops.length >= 2) {
@@ -121,6 +217,7 @@ export default function MapScreen({ route, navigation }) {
               const coords = await fetchRouteForSegment(beforeUserStops);
               if (coords && coords.length > 0) {
                 segmentsData.push({ coords, color: ROUTE_COLORS.fullRoute, type: 'firstLeg-before', leg: 1 });
+                console.log('🟡 Added firstLeg-before (gray):', beforeUserStops.length, 'stops');
               }
             }
           }
@@ -133,6 +230,7 @@ export default function MapScreen({ route, navigation }) {
             const coords = await fetchRouteForSegment(firstLegUserStops);
             if (coords && coords.length > 0) {
               segmentsData.push({ coords, color: ROUTE_COLORS.firstLeg, type: 'firstLeg-user', leg: 1 });
+              console.log('🟠 Added firstLeg-user (orange):', firstLegUserStops.length, 'stops');
             }
           }
 
@@ -144,6 +242,7 @@ export default function MapScreen({ route, navigation }) {
               const coords = await fetchRouteForSegment(secondLegUserStops);
               if (coords && coords.length > 0) {
                 segmentsData.push({ coords, color: ROUTE_COLORS.secondLeg, type: 'secondLeg-user', leg: 2 });
+                console.log('🔵 Added secondLeg-user (blue):', secondLegUserStops.length, 'stops');
               }
             }
           }
@@ -156,6 +255,7 @@ export default function MapScreen({ route, navigation }) {
               const coords = await fetchRouteForSegment(afterUserStops);
               if (coords && coords.length > 0) {
                 segmentsData.push({ coords, color: ROUTE_COLORS.fullRoute, type: 'secondLeg-after', leg: 2 });
+                console.log('🔘 Added secondLeg-after (gray):', afterUserStops.length, 'stops');
               }
             }
           }
