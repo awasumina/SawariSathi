@@ -9,7 +9,7 @@ import {
   StatusBar,
   Dimensions,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, fontSizes } from '../constants/theme';
 import { API_BASE_URL } from '../config/api';
@@ -375,7 +375,6 @@ export default function MapScreen({ route, navigation }) {
       
       <MapView
         ref={mapRef}
-        provider={PROVIDER_GOOGLE}
         style={styles.map}
         initialRegion={initialRegion}
         onMapReady={onMapReady}
