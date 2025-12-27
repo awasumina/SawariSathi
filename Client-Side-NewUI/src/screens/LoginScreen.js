@@ -85,10 +85,11 @@ const InputField = ({
 
 const LoginScreen = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
-  const [uiState, setUiState] = useState({ 
-    isLoading: false, 
-    showPassword: false, 
-    errors: {} 
+  const [uiState, setUiState] = useState({
+    isLoading: false,
+    showPassword: false,
+    errors: {},
+    checkingAuth: true, // Add initial auth check state
   });
   const navigation = useNavigation();
 
@@ -101,11 +102,23 @@ const LoginScreen = () => {
       const token = await AsyncStorage.getItem("authToken");
       if (token) {
         navigation.replace("Main");
+      } else {
+        setUiState(prev => ({ ...prev, checkingAuth: false }));
       }
     } catch (err) {
       console.log("Error checking auth status:", err);
+      setUiState(prev => ({ ...prev, checkingAuth: false }));
     }
   };
+
+  // Show loading screen while checking auth status
+  if (uiState.checkingAuth) {
+    return (
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </SafeAreaView>
+    );
+  }
 
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
@@ -274,9 +287,15 @@ const LoginScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.background 
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
   },
   gradient: { 
     flex: 1 
