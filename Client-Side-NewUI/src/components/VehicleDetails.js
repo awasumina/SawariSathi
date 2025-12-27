@@ -27,10 +27,30 @@ const VehicleDetails = ({ route, navigation }) => {
   const [isFavorite, setIsFavorite] = useState(false);
   const [isLoadingFavorite, setIsLoadingFavorite] = useState(true);
 
+  // Helper function to convert stop data to consistent format
+  const convertStops = (stopsArray) => {
+    if (!stopsArray || !Array.isArray(stopsArray)) return [];
+    return stopsArray.map(stop => ({
+      id: stop.id,
+      name: stop.stops_name || stop.name || 'Unknown Stop',
+      stops_name: stop.stops_name || stop.name || 'Unknown Stop',
+      lat: parseFloat(stop.stops_lat || stop.lat) || 0,
+      lon: parseFloat(stop.stops_lon || stop.lon) || 0,
+      stops_lat: stop.stops_lat || stop.lat,
+      stops_lon: stop.stops_lon || stop.lon
+    }));
+  };
+
   // Enhanced safeTransport object to include multi-leg journey properties
   const safeTransport = React.useMemo(() => {
     console.log("Raw transport data:", transport);
-    
+
+    // User journey stops (filtered to user's from/to)
+    const userStops = convertStops(transport?.stops);
+
+    // All route stops (full route from terminus to terminus)
+    const fullRouteStops = convertStops(transport?.allRouteStops);
+
     const result = {
       id: transport?.id || `vehicle-${Math.random()}`,
       vehicle: {
@@ -38,15 +58,8 @@ const VehicleDetails = ({ route, navigation }) => {
         name: transport?.vehicle?.name || transport?.routeName || 'Unknown Service',
         count: transport?.vehicle?.count || 'N/A',
       },
-      stops: transport?.stops?.map(stop => ({
-        id: stop.id, // Preserve stop ID for matching
-        name: stop.stops_name || stop.name || 'Unknown Stop',
-        stops_name: stop.stops_name || stop.name || 'Unknown Stop', // Add both formats
-        lat: parseFloat(stop.stops_lat || stop.lat) || 0,
-        lon: parseFloat(stop.stops_lon || stop.lon) || 0,
-        stops_lat: stop.stops_lat || stop.lat,
-        stops_lon: stop.stops_lon || stop.lon
-      })) || [],
+      stops: userStops, // User's journey segment
+      allRouteStops: fullRouteStops.length > 0 ? fullRouteStops : userStops, // Full route for map
       fare: transport?.fare ?? 0,
       discountedFare: transport?.discountedFare ?? null,
       distance: transport?.distance || 'N/A',
@@ -70,10 +83,11 @@ const VehicleDetails = ({ route, navigation }) => {
       fromStopId: transport?.fromStopId || null,
       toStopId: transport?.toStopId || null,
     };
-    
+
     console.log("SafeTransport processed:", result);
     console.log("Stops count:", result.stops.length);
-    
+    console.log("All route stops count:", result.allRouteStops.length);
+
     return result;
   }, [transport, fromLocation, toLocation]);
 
@@ -122,41 +136,47 @@ const VehicleDetails = ({ route, navigation }) => {
   }, [isFavorite, safeTransport]);
 
   const handleViewMap = () => {
-    if (!safeTransport.stops || safeTransport.stops.length === 0) {
+    // Use allRouteStops for map (full route), fall back to stops (user journey)
+    const mapStops = safeTransport.allRouteStops && safeTransport.allRouteStops.length > 0
+      ? safeTransport.allRouteStops
+      : safeTransport.stops;
+
+    if (!mapStops || mapStops.length === 0) {
       alert("No stop information available to display on the map.");
       return;
     }
 
     console.log('🗺️ handleViewMap - Starting with:', {
-      totalStops: safeTransport.stops.length,
+      userJourneyStops: safeTransport.stops.length,
+      fullRouteStops: mapStops.length,
       fromLocation,
       toLocation,
       fromStopId: safeTransport.fromStopId,
       toStopId: safeTransport.toStopId,
-      availableStops: safeTransport.stops.map(s => ({ id: s.id, name: s.name || s.stops_name }))
+      availableStops: mapStops.map(s => ({ id: s.id, name: s.name || s.stops_name }))
     });
 
-    // Calculate user journey indices for highlighting on map
+    // Calculate user journey indices within the FULL route for highlighting on map
     let userJourneyFromIndex = -1;
     let userJourneyToIndex = -1;
 
-    // First try matching by stop ID
+    // First try matching by stop ID in the full route
     if (safeTransport.fromStopId && safeTransport.toStopId) {
-      userJourneyFromIndex = safeTransport.stops.findIndex(stop =>
+      userJourneyFromIndex = mapStops.findIndex(stop =>
         stop.id == safeTransport.fromStopId
       );
-      userJourneyToIndex = safeTransport.stops.findIndex(stop =>
+      userJourneyToIndex = mapStops.findIndex(stop =>
         stop.id == safeTransport.toStopId
       );
-      console.log('🔍 ID matching result:', { userJourneyFromIndex, userJourneyToIndex });
+      console.log('🔍 ID matching result (in full route):', { userJourneyFromIndex, userJourneyToIndex });
     }
 
     // Fallback to exact name matching
     if (userJourneyFromIndex === -1 || userJourneyToIndex === -1) {
-      userJourneyFromIndex = safeTransport.stops.findIndex(stop =>
+      userJourneyFromIndex = mapStops.findIndex(stop =>
         stop.name === fromLocation || stop.stops_name === fromLocation
       );
-      userJourneyToIndex = safeTransport.stops.findIndex(stop =>
+      userJourneyToIndex = mapStops.findIndex(stop =>
         stop.name === toLocation || stop.stops_name === toLocation
       );
       console.log('🔍 Exact name matching result:', { userJourneyFromIndex, userJourneyToIndex });
@@ -168,13 +188,13 @@ const VehicleDetails = ({ route, navigation }) => {
       const toLower = toLocation.toLowerCase();
 
       if (userJourneyFromIndex === -1) {
-        userJourneyFromIndex = safeTransport.stops.findIndex(stop => {
+        userJourneyFromIndex = mapStops.findIndex(stop => {
           const stopName = (stop.name || stop.stops_name || '').toLowerCase();
           return stopName.includes(fromLower) || fromLower.includes(stopName);
         });
       }
       if (userJourneyToIndex === -1) {
-        userJourneyToIndex = safeTransport.stops.findIndex(stop => {
+        userJourneyToIndex = mapStops.findIndex(stop => {
           const stopName = (stop.name || stop.stops_name || '').toLowerCase();
           return stopName.includes(toLower) || toLower.includes(stopName);
         });
@@ -186,13 +206,13 @@ const VehicleDetails = ({ route, navigation }) => {
     const startIdx = Math.min(userJourneyFromIndex, userJourneyToIndex);
     const endIdx = Math.max(userJourneyFromIndex, userJourneyToIndex);
 
-    console.log('🗺️ Map params - Complete route:', safeTransport.stops.length, 'stops');
+    console.log('🗺️ Map params - Full route:', mapStops.length, 'stops');
     console.log('🗺️ User journey segment:', startIdx, 'to', endIdx,
-      `(${safeTransport.stops[startIdx]?.name || safeTransport.stops[startIdx]?.stops_name} → ${safeTransport.stops[endIdx]?.name || safeTransport.stops[endIdx]?.stops_name})`);
+      `(${mapStops[startIdx]?.name || mapStops[startIdx]?.stops_name} → ${mapStops[endIdx]?.name || mapStops[endIdx]?.stops_name})`);
 
     // Prepare navigation parameters
     const mapParams = {
-      stops: safeTransport.stops, // Complete route (C to D)
+      stops: mapStops, // FULL route (A to G) for showing complete bus route on map
       fromLocation,
       toLocation,
       routeInfo: {
@@ -200,9 +220,9 @@ const VehicleDetails = ({ route, navigation }) => {
         type: safeTransport.vehicleType,
         number: safeTransport.routeNumber,
       },
-      // User journey segment info (A to B)
+      // User journey segment indices within the full route
       userJourneyFromIndex: startIdx !== -1 ? startIdx : 0,
-      userJourneyToIndex: endIdx !== -1 ? endIdx : safeTransport.stops.length - 1,
+      userJourneyToIndex: endIdx !== -1 ? endIdx : mapStops.length - 1,
     };
 
     // Add walking information if available (from location-based search)

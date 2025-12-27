@@ -257,6 +257,7 @@ export const transformRouteData = (apiDetailData, fromStopId, toStopId, isMultiL
         fare,
         discountedFare,
         stops: apiDetailData.stops || [],
+        allRouteStops: apiDetailData.allRouteStops || apiDetailData.stops || [], // Full route for map
         distance: mainDistance,
         estimatedTime: vehicleTiming,
         vehicleType,
@@ -641,6 +642,23 @@ const SearchScreen = ({ navigation, route }) => {
                             lastStop: route.stops[route.stops.length - 1]?.stops_name
                         });
                     }
+
+                    // Extract ALL route stops (full route) from segments for map display
+                    // This includes stops before and after the user's journey
+                    let allRouteStops = [];
+                    if (route.segments && route.segments.length > 0) {
+                        if (route.segments[0].allRouteStops && route.segments[0].allRouteStops.length > 0) {
+                            allRouteStops = route.segments[0].allRouteStops;
+                            console.log('📍 Full route stops extracted:', {
+                                fullRouteCount: allRouteStops.length,
+                                userJourneyCount: route.stops?.length,
+                                firstStop: allRouteStops[0]?.stops_name,
+                                lastStop: allRouteStops[allRouteStops.length - 1]?.stops_name
+                            });
+                        }
+                    }
+                    // Store allRouteStops on the route object for later use
+                    route.allRouteStops = allRouteStops.length > 0 ? allRouteStops : route.stops;
 
                     console.log('Transform route with stops:', {
                         fromStopId,
