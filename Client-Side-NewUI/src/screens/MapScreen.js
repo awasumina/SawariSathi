@@ -48,6 +48,15 @@ export default function MapScreen({ route, navigation }) {
   const userJourneyFromIndex = route.params?.userJourneyFromIndex ?? 0;
   const userJourneyToIndex = route.params?.userJourneyToIndex ?? (stops.length - 1);
 
+  console.log('📍 MapScreen params received:', {
+    stopsCount: stops.length,
+    fromLocation,
+    toLocation,
+    userJourneyFromIndex,
+    userJourneyToIndex,
+    paramIsMultiLeg
+  });
+
   // Log all stops for debugging
   console.log('🛑 All stops received:', stops.map((s, i) => ({
     index: i,
@@ -262,6 +271,13 @@ export default function MapScreen({ route, navigation }) {
 
         } else {
           // SINGLE ROUTE: Show user journey vs full route
+          console.log('🎨 Drawing single route:', {
+            totalStops: allStops.length,
+            userJourneyFromIndex,
+            userJourneyToIndex,
+            fromStopName: allStops[userJourneyFromIndex]?.name,
+            toStopName: allStops[userJourneyToIndex]?.name
+          });
 
           // Before user journey (A to C) - Gray
           if (userJourneyFromIndex > 0) {
@@ -270,8 +286,12 @@ export default function MapScreen({ route, navigation }) {
               const coords = await fetchRouteForSegment(beforeStops);
               if (coords && coords.length > 0) {
                 segmentsData.push({ coords, color: ROUTE_COLORS.fullRoute, type: 'before' });
+                console.log('⬜ Added before-journey (gray):', beforeStops.length, 'stops',
+                  `(${beforeStops[0]?.name} → ${beforeStops[beforeStops.length-1]?.name})`);
               }
             }
+          } else {
+            console.log('⚠️ No before-journey segment (userJourneyFromIndex is 0)');
           }
 
           // User journey (C to D) - Orange (highlighted)
@@ -280,6 +300,8 @@ export default function MapScreen({ route, navigation }) {
             const coords = await fetchRouteForSegment(userStops);
             if (coords && coords.length > 0) {
               segmentsData.push({ coords, color: ROUTE_COLORS.userJourney, type: 'userJourney' });
+              console.log('🟠 Added user-journey (orange):', userStops.length, 'stops',
+                `(${userStops[0]?.name} → ${userStops[userStops.length-1]?.name})`);
             }
           }
 
@@ -290,8 +312,12 @@ export default function MapScreen({ route, navigation }) {
               const coords = await fetchRouteForSegment(afterStops);
               if (coords && coords.length > 0) {
                 segmentsData.push({ coords, color: ROUTE_COLORS.fullRoute, type: 'after' });
+                console.log('⬜ Added after-journey (gray):', afterStops.length, 'stops',
+                  `(${afterStops[0]?.name} → ${afterStops[afterStops.length-1]?.name})`);
               }
             }
+          } else {
+            console.log('⚠️ No after-journey segment (userJourneyToIndex is last stop)');
           }
         }
 

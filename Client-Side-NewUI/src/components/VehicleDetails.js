@@ -127,10 +127,20 @@ const VehicleDetails = ({ route, navigation }) => {
       return;
     }
 
+    console.log('🗺️ handleViewMap - Starting with:', {
+      totalStops: safeTransport.stops.length,
+      fromLocation,
+      toLocation,
+      fromStopId: safeTransport.fromStopId,
+      toStopId: safeTransport.toStopId,
+      availableStops: safeTransport.stops.map(s => ({ id: s.id, name: s.name || s.stops_name }))
+    });
+
     // Calculate user journey indices for highlighting on map
     let userJourneyFromIndex = -1;
     let userJourneyToIndex = -1;
 
+    // First try matching by stop ID
     if (safeTransport.fromStopId && safeTransport.toStopId) {
       userJourneyFromIndex = safeTransport.stops.findIndex(stop =>
         stop.id == safeTransport.fromStopId
@@ -138,9 +148,10 @@ const VehicleDetails = ({ route, navigation }) => {
       userJourneyToIndex = safeTransport.stops.findIndex(stop =>
         stop.id == safeTransport.toStopId
       );
+      console.log('🔍 ID matching result:', { userJourneyFromIndex, userJourneyToIndex });
     }
 
-    // Fallback to name matching
+    // Fallback to exact name matching
     if (userJourneyFromIndex === -1 || userJourneyToIndex === -1) {
       userJourneyFromIndex = safeTransport.stops.findIndex(stop =>
         stop.name === fromLocation || stop.stops_name === fromLocation
@@ -148,6 +159,27 @@ const VehicleDetails = ({ route, navigation }) => {
       userJourneyToIndex = safeTransport.stops.findIndex(stop =>
         stop.name === toLocation || stop.stops_name === toLocation
       );
+      console.log('🔍 Exact name matching result:', { userJourneyFromIndex, userJourneyToIndex });
+    }
+
+    // Fallback to case-insensitive partial name matching
+    if (userJourneyFromIndex === -1 || userJourneyToIndex === -1) {
+      const fromLower = fromLocation.toLowerCase();
+      const toLower = toLocation.toLowerCase();
+
+      if (userJourneyFromIndex === -1) {
+        userJourneyFromIndex = safeTransport.stops.findIndex(stop => {
+          const stopName = (stop.name || stop.stops_name || '').toLowerCase();
+          return stopName.includes(fromLower) || fromLower.includes(stopName);
+        });
+      }
+      if (userJourneyToIndex === -1) {
+        userJourneyToIndex = safeTransport.stops.findIndex(stop => {
+          const stopName = (stop.name || stop.stops_name || '').toLowerCase();
+          return stopName.includes(toLower) || toLower.includes(stopName);
+        });
+      }
+      console.log('🔍 Partial name matching result:', { userJourneyFromIndex, userJourneyToIndex });
     }
 
     // Ensure correct order (start to end)
@@ -155,7 +187,8 @@ const VehicleDetails = ({ route, navigation }) => {
     const endIdx = Math.max(userJourneyFromIndex, userJourneyToIndex);
 
     console.log('🗺️ Map params - Complete route:', safeTransport.stops.length, 'stops');
-    console.log('🗺️ User journey segment:', startIdx, 'to', endIdx);
+    console.log('🗺️ User journey segment:', startIdx, 'to', endIdx,
+      `(${safeTransport.stops[startIdx]?.name || safeTransport.stops[startIdx]?.stops_name} → ${safeTransport.stops[endIdx]?.name || safeTransport.stops[endIdx]?.stops_name})`);
 
     // Prepare navigation parameters
     const mapParams = {
