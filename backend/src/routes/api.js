@@ -37,7 +37,10 @@ import {
   getUserProfile,
   updateUserProfile,
   verifyOTP,
-  resendOTP
+  resendOTP,
+  forgotPassword,
+  verifyResetOTP,
+  resetPassword
 } from '../controllers/authController.js';
 
 // Middleware
@@ -137,6 +140,15 @@ router.post('/auth/resend-otp', signupLimiter, resendOTP);
 
 // User Login (with rate limiting) - Requires verified email
 router.post('/auth/login', loginLimiter, userLogin);
+
+// Forgot Password - Send reset OTP
+router.post('/auth/forgot-password', signupLimiter, forgotPassword);
+
+// Verify Reset OTP
+router.post('/auth/verify-reset-otp', signupLimiter, verifyResetOTP);
+
+// Reset Password with OTP
+router.post('/auth/reset-password', signupLimiter, resetPassword);
 
 // Get User Profile (protected with JWT)
 router.get('/auth/profile/:id', authMiddleware, getUserProfile);

@@ -12,6 +12,7 @@ import NoticeDetailScreen from '../screens/NoticeDetailScreen';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import OTPVerificationScreen from '../screens/OTPVerificationScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../constants/theme';
@@ -129,7 +130,12 @@ const StackNavigator = () => {
           component={OTPVerificationScreen}
           options={{ headerShown: false }}
         />
-        
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPasswordScreen}
+          options={{ headerShown: false }}
+        />
+
         {/* Main App Screens */}
         <Stack.Screen
           name="Main"

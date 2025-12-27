@@ -515,6 +515,257 @@ export const getUserProfile = async (req, res) => {
 };
 
 // ============================================
+// Forgot Password - Send Reset OTP
+// ============================================
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const sanitizedEmail = email.trim().toLowerCase();
+
+    // Find user
+    const { data: user, error: findError } = await supabase
+      .from("users")
+      .select("email, full_name, is_verified")
+      .eq("email", sanitizedEmail)
+      .maybeSingle();
+
+    if (findError || !user) {
+      // Don't reveal if email exists (security)
+      return res.status(200).json({
+        success: true,
+        message: "If an account exists with this email, a reset code has been sent.",
+      });
+    }
+
+    if (!user.is_verified) {
+      return res.status(400).json({
+        success: false,
+        message: "Please verify your email first before resetting password.",
+      });
+    }
+
+    // Generate OTP for password reset
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + (OTP_EXPIRY_MINUTES * 60 * 1000) + (6 * 60 * 60 * 1000));
+
+    // Update user with reset OTP
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        reset_otp: otp,
+        reset_otp_expires: otpExpires.toISOString(),
+        reset_attempts: 0,
+      })
+      .eq("email", sanitizedEmail);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    // Send reset OTP email
+    try {
+      await sendOTPEmail(sanitizedEmail, otp, user.full_name, true); // true = password reset
+    } catch (emailError) {
+      console.error("Error sending reset OTP email:", emailError);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send reset email. Please try again.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset code sent to your email.",
+    });
+  } catch (err) {
+    console.error("Error in forgotPassword:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Error processing password reset request",
+      error: err.message,
+    });
+  }
+};
+
+// ============================================
+// Verify Reset OTP
+// ============================================
+export const verifyResetOTP = async (req, res) => {
+  const { email, otp } = req.body;
+
+  try {
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required",
+      });
+    }
+
+    const sanitizedEmail = email.trim().toLowerCase();
+
+    // Find user with reset OTP
+    const { data: user, error: findError } = await supabase
+      .from("users")
+      .select("email, reset_otp, reset_otp_expires, reset_attempts")
+      .eq("email", sanitizedEmail)
+      .maybeSingle();
+
+    if (findError || !user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Check attempts
+    if (user.reset_attempts >= 5) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many failed attempts. Please request a new code.",
+      });
+    }
+
+    // Check if OTP expired
+    const now = new Date();
+    const otpExpires = new Date(user.reset_otp_expires);
+
+    if (!user.reset_otp || now > otpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: "Reset code has expired. Please request a new one.",
+      });
+    }
+
+    // Verify OTP
+    if (user.reset_otp !== otp) {
+      await supabase
+        .from("users")
+        .update({ reset_attempts: user.reset_attempts + 1 })
+        .eq("email", sanitizedEmail);
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid code. Please try again.",
+        attemptsLeft: 5 - (user.reset_attempts + 1),
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "OTP verified successfully. You can now reset your password.",
+    });
+  } catch (err) {
+    console.error("Error in verifyResetOTP:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Error verifying reset code",
+      error: err.message,
+    });
+  }
+};
+
+// ============================================
+// Reset Password
+// ============================================
+export const resetPassword = async (req, res) => {
+  const { email, otp, newPassword } = req.body;
+
+  try {
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, OTP, and new password are required",
+      });
+    }
+
+    // Validate password strength
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 8 characters long",
+      });
+    }
+
+    const hasUpperCase = /[A-Z]/.test(newPassword);
+    const hasLowerCase = /[a-z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+
+    if (!hasUpperCase || !hasLowerCase || !hasNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must contain uppercase, lowercase, and numbers",
+      });
+    }
+
+    const sanitizedEmail = email.trim().toLowerCase();
+
+    // Find user and verify OTP again
+    const { data: user, error: findError } = await supabase
+      .from("users")
+      .select("email, reset_otp, reset_otp_expires")
+      .eq("email", sanitizedEmail)
+      .maybeSingle();
+
+    if (findError || !user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Verify OTP is still valid
+    const now = new Date();
+    const otpExpires = new Date(user.reset_otp_expires);
+
+    if (!user.reset_otp || user.reset_otp !== otp || now > otpExpires) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset code. Please request a new one.",
+      });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password and clear reset OTP
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        password: hashedPassword,
+        reset_otp: null,
+        reset_otp_expires: null,
+        reset_attempts: 0,
+      })
+      .eq("email", sanitizedEmail);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully. Please login with your new password.",
+    });
+  } catch (err) {
+    console.error("Error in resetPassword:", err.message);
+    res.status(500).json({
+      success: false,
+      message: "Error resetting password",
+      error: err.message,
+    });
+  }
+};
+
+// ============================================
 // Update User Profile (with JWT verification)
 // ============================================
 export const updateUserProfile = async (req, res) => {

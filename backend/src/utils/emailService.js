@@ -17,15 +17,24 @@ export const generateOTP = () => {
   return crypto.randomInt(100000, 999999).toString();
 };
 
-// Send OTP email
-export const sendOTPEmail = async (email, otp, fullName) => {
+// Send OTP email (for verification or password reset)
+export const sendOTPEmail = async (email, otp, fullName, isPasswordReset = false) => {
   try {
     const transporter = createTransporter();
+
+    const subject = isPasswordReset
+      ? '🔑 Password Reset Code - Sawari Sathi'
+      : '🔐 Verify Your Email - Sawari Sathi';
+
+    const headerTitle = isPasswordReset ? 'Password Reset' : 'Email Verification';
+    const headerMessage = isPasswordReset
+      ? 'You requested to reset your password. Use the code below to proceed.'
+      : 'Thank you for registering with Sawari Sathi. Please use the OTP code below to verify your email address.';
 
     const mailOptions = {
       from: `Sawari Sathi <${process.env.GMAIL_USER}>`,
       to: email,
-      subject: '🔐 Verify Your Email - Sawari Sathi',
+      subject: subject,
       html: `
         <!DOCTYPE html>
         <html>
@@ -94,11 +103,11 @@ export const sendOTPEmail = async (email, otp, fullName) => {
           <div class="container">
             <div class="header">
               <h1>🚍 Sawari Sathi</h1>
-              <p>Email Verification</p>
+              <p>${headerTitle}</p>
             </div>
             <div class="content">
               <h2>Hello ${fullName}! 👋</h2>
-              <p>Thank you for registering with Sawari Sathi. Please use the OTP code below to verify your email address.</p>
+              <p>${headerMessage}</p>
               
               <div class="otp-box">
                 <p class="otp-code">${otp}</p>

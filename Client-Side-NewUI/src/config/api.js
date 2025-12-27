@@ -1,7 +1,7 @@
 // src/config/api.js
 
 // Use your actual local IP address or domain name here
-const LOCAL_IP = ' 192.168.1.77'; // <-- Updated to current IP
+const LOCAL_IP = '192.168.1.77'; // <-- Updated to current IP
 
 // Base URL for the main application API (routes, stops, etc.)
 export const API_BASE_URL = `http://${LOCAL_IP}:3000/api`;
