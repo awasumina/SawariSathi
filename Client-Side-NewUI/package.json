@@ -20,6 +20,7 @@
     "axios": "^1.7.9",
     "expo": "~52.0.19",
     "expo-dev-client": "^5.0.20",
+    "expo-linear-gradient": "~15.0.8",
     "expo-location": "^18.0.5",
     "expo-status-bar": "~2.0.0",
     "leaflet": "^1.9.4",
