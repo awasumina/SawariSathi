@@ -7,37 +7,30 @@ import {
   SafeAreaView,
   ActivityIndicator,
   StatusBar,
-  Dimensions,
 } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const ASPECT_RATIO = SCREEN_WIDTH / SCREEN_HEIGHT;
-const LATITUDE_DELTA = 0.0922;
-const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
+import { WebView } from 'react-native-webview';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, fontSizes } from '../constants/theme';
 import { API_BASE_URL } from '../config/api';
 
 export default function MapScreen({ route, navigation }) {
-  const [routeSegments, setRouteSegments] = useState([]); // Array of {coords, color} objects
+  const [routeSegments, setRouteSegments] = useState([]);
   const [walkingToStartCoords, setWalkingToStartCoords] = useState([]);
   const [walkingFromEndCoords, setWalkingFromEndCoords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [mapLayout, setMapLayout] = useState(null);
   const [mapReady, setMapReady] = useState(false);
   const fetchedRef = useRef(false);
-  const mapRef = useRef(null);
+  const webViewRef = useRef(null);
 
   // Define colors for route segments
   const ROUTE_COLORS = {
-    completeRoute: '#9E9E9E', // Gray for complete bus route (C to D)
-    userJourney: colors.primary, // Orange/Primary for user's journey (A to B)
-    walking: '#FF6B6B', // Red for walking paths
+    completeRoute: '#9E9E9E',
+    userJourney: colors.primary,
+    walking: '#FF6B6B',
   };
 
-  // Default values in case route.params is undefined
+  // Default values
   const stops = route.params?.stops || [];
   const fromLocation = route.params?.fromLocation || 'Starting Point';
   const toLocation = route.params?.toLocation || 'Destination';
@@ -45,34 +38,20 @@ export default function MapScreen({ route, navigation }) {
   const isMultiLeg = route.params?.isMultiLeg || false;
   const transferStop = route.params?.transferStop || null;
   const secondLegStops = route.params?.secondLegStops || [];
-  const walkingInfo = route.params?.walkingInfo || null;
   const fromCoordinates = route.params?.fromCoordinates || null;
   const toCoordinates = route.params?.toCoordinates || null;
-
-  // User journey segment indices (A to B within complete route C to D)
   const userJourneyFromIndex = route.params?.userJourneyFromIndex ?? 0;
   const userJourneyToIndex = route.params?.userJourneyToIndex ?? (stops.length - 1);
 
-  // Debug: Log what coordinates were received
-  console.log('🗺️ MapScreen received:', {
-    hasFromCoordinates: !!fromCoordinates,
-    hasToCoordinates: !!toCoordinates,
-    stopsCount: stops.length,
-    userJourneyFromIndex,
-    userJourneyToIndex,
-    isMultiLeg
-  });
-  
-  // Convert received stops to proper format
+  // Convert stops to proper format
   const convertedStops = stops.map((stop) => ({
     latitude: parseFloat(stop.lat || stop.stops_lat || 0),
     longitude: parseFloat(stop.lon || stop.stops_lon || 0),
     name: stop.name || stop.stops_name || 'Stop',
-    isTransfer: transferStop ? 
+    isTransfer: transferStop ?
       (stop.name === transferStop.stops_name || stop.stops_name === transferStop.stops_name) : false
   }));
 
-  // Convert second leg stops if available
   const convertedSecondLegStops = secondLegStops.map((stop) => ({
     latitude: parseFloat(stop.lat || stop.stops_lat || 0),
     longitude: parseFloat(stop.lon || stop.stops_lon || 0),
@@ -81,61 +60,47 @@ export default function MapScreen({ route, navigation }) {
       (stop.name === transferStop.stops_name || stop.stops_name === transferStop.stops_name) : false
   }));
 
-  // Combine both legs for visualization
   const allStops = isMultiLeg ?
     [...convertedStops, ...convertedSecondLegStops.filter(stop =>
       !convertedStops.some(s => s.latitude === stop.latitude && s.longitude === stop.longitude)
     )] :
     convertedStops;
 
-  // Find transfer stop if it exists
   const transferStopCoord = allStops.find(stop => stop.isTransfer);
 
-  // Split route into segments: before user journey, user journey, after user journey
   const splitRouteIntoJourneySegments = (stops, fromIdx, toIdx) => {
     if (stops.length < 2) return { beforeJourney: [], userJourney: [], afterJourney: [] };
-
     const safeFromIdx = Math.max(0, Math.min(fromIdx, stops.length - 1));
     const safeToIdx = Math.max(0, Math.min(toIdx, stops.length - 1));
-
-    // Segment before user journey (route start C to user's start A)
     const beforeJourney = safeFromIdx > 0 ? stops.slice(0, safeFromIdx + 1) : [];
-
-    // User's journey segment (A to B)
     const userJourney = stops.slice(safeFromIdx, safeToIdx + 1);
-
-    // Segment after user journey (user's end B to route end D)
     const afterJourney = safeToIdx < stops.length - 1 ? stops.slice(safeToIdx) : [];
-
     return { beforeJourney, userJourney, afterJourney };
   };
 
-  console.log('🔍 All Stops:', allStops.map(s => s.name));
-
-  // Get journey segments for highlighting
   const journeySegments = splitRouteIntoJourneySegments(allStops, userJourneyFromIndex, userJourneyToIndex);
-  console.log('📍 Route Segments:', {
-    beforeJourney: journeySegments.beforeJourney.map(s => s.name),
-    userJourney: journeySegments.userJourney.map(s => s.name),
-    afterJourney: journeySegments.afterJourney.map(s => s.name),
-  });
+
+  // Filter valid stops
+  const validStops = allStops.filter(stop => stop.latitude !== 0 && stop.longitude !== 0);
+
+  // Calculate center
+  const centerLat = validStops.length > 0
+    ? validStops.reduce((sum, s) => sum + s.latitude, 0) / validStops.length
+    : 27.7172;
+  const centerLng = validStops.length > 0
+    ? validStops.reduce((sum, s) => sum + s.longitude, 0) / validStops.length
+    : 85.3240;
 
   useEffect(() => {
-    // Prevent multiple fetches for the same route
-    if (allStops.length < 2 || fetchedRef.current) {
-      return;
-    }
+    if (allStops.length < 2 || fetchedRef.current) return;
 
     const getRoutes = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        // Fetch walking path from origin to user's boarding stop (A) if coordinates provided
         if (fromCoordinates && journeySegments.userJourney.length > 0) {
           const userBoardingStop = journeySegments.userJourney[0];
-          console.log('🎯 Origin coordinates detected:', fromCoordinates);
-          console.log('🚶 Fetching walking path from origin to boarding stop...');
           await fetchWalkingRoute(
             { latitude: fromCoordinates.latitude, longitude: fromCoordinates.longitude },
             userBoardingStop,
@@ -145,30 +110,21 @@ export default function MapScreen({ route, navigation }) {
 
         const segmentsData = [];
 
-        // Fetch route BEFORE user journey (C to A) - Gray color
         if (journeySegments.beforeJourney.length >= 2) {
-          console.log('🚌 Fetching BEFORE journey segment (gray):',
-            journeySegments.beforeJourney.map(s => s.name).join(' → '));
           const coords = await fetchRouteForSegment(journeySegments.beforeJourney);
           if (coords && coords.length > 0) {
             segmentsData.push({ coords, color: ROUTE_COLORS.completeRoute, type: 'before' });
           }
         }
 
-        // Fetch USER JOURNEY route (A to B) - Highlighted color
         if (journeySegments.userJourney.length >= 2) {
-          console.log('🚌 Fetching USER JOURNEY segment (highlighted):',
-            journeySegments.userJourney.map(s => s.name).join(' → '));
           const coords = await fetchRouteForSegment(journeySegments.userJourney);
           if (coords && coords.length > 0) {
             segmentsData.push({ coords, color: ROUTE_COLORS.userJourney, type: 'userJourney' });
           }
         }
 
-        // Fetch route AFTER user journey (B to D) - Gray color
         if (journeySegments.afterJourney.length >= 2) {
-          console.log('🚌 Fetching AFTER journey segment (gray):',
-            journeySegments.afterJourney.map(s => s.name).join(' → '));
           const coords = await fetchRouteForSegment(journeySegments.afterJourney);
           if (coords && coords.length > 0) {
             segmentsData.push({ coords, color: ROUTE_COLORS.completeRoute, type: 'after' });
@@ -176,13 +132,9 @@ export default function MapScreen({ route, navigation }) {
         }
 
         setRouteSegments(segmentsData);
-        console.log(`📊 Total segments displayed: ${segmentsData.length}`);
 
-        // Fetch walking path from user's alighting stop (B) to destination if coordinates provided
         if (toCoordinates && journeySegments.userJourney.length > 0) {
           const userAlightingStop = journeySegments.userJourney[journeySegments.userJourney.length - 1];
-          console.log('🎯 Destination coordinates detected:', toCoordinates);
-          console.log('🚶 Fetching walking path from alighting stop to destination...');
           await fetchWalkingRoute(
             userAlightingStop,
             { latitude: toCoordinates.latitude, longitude: toCoordinates.longitude },
@@ -190,7 +142,7 @@ export default function MapScreen({ route, navigation }) {
           );
         }
 
-        fetchedRef.current = true; // Mark that we've fetched for this route
+        fetchedRef.current = true;
       } catch (error) {
         console.error('Route fetch error:', error);
         setError('Failed to fetch route');
@@ -202,34 +154,23 @@ export default function MapScreen({ route, navigation }) {
     getRoutes();
   }, [JSON.stringify(allStops), userJourneyFromIndex, userJourneyToIndex]);
 
-  // Reset the fetch ref when route params change
   useEffect(() => {
-    return () => {
-      fetchedRef.current = false;
-    };
+    return () => { fetchedRef.current = false; };
   }, [route.params]);
 
   const fetchRouteForSegment = async (stops) => {
     if (stops.length < 2) return [];
-
     try {
       const origin = stops[0];
       const destination = stops[stops.length - 1];
       const waypoints = stops.slice(1, -1).map((p) => `${p.latitude},${p.longitude}`).join('|');
-
-      // Use backend proxy instead of calling Google API directly
       const url = `${API_BASE_URL}/routes/driving-directions?origin=${origin.latitude},${origin.longitude}&destination=${destination.latitude},${destination.longitude}&waypoints=${waypoints}`;
-
       const res = await fetch(url);
       const json = await res.json();
-
       if (json.polyline) {
-        const points = decodePolyline(json.polyline);
-        return points;
-      } else {
-        console.error('No routes found for segment:', json);
-        return [];
+        return decodePolyline(json.polyline);
       }
+      return [];
     } catch (error) {
       console.error('Route fetch error:', error);
       return [];
@@ -238,47 +179,30 @@ export default function MapScreen({ route, navigation }) {
 
   const fetchWalkingRoute = async (origin, destination, setCoords) => {
     if (!origin || !destination) return;
-
     try {
       const url = `${API_BASE_URL}/routes/walking-directions?fromLat=${origin.latitude}&fromLng=${origin.longitude}&toLat=${destination.latitude}&toLng=${destination.longitude}`;
-
-      console.log('Fetching walking route from backend:', url);
-
       const res = await fetch(url);
       const json = await res.json();
-
       if (json.polyline) {
-        const points = decodePolyline(json.polyline);
-        setCoords(points);
-        console.log(`Walking route decoded: ${points.length} points`);
-      } else {
-        console.warn('No walking route found:', json.message);
+        setCoords(decodePolyline(json.polyline));
       }
     } catch (error) {
       console.error('Walking route fetch error:', error);
-      // Don't throw error for walking routes, just log it
     }
   };
 
   const decodePolyline = (encoded) => {
     let points = [];
-    let index = 0,
-      len = encoded.length;
-    let lat = 0,
-      lng = 0;
-
+    let index = 0, len = encoded.length;
+    let lat = 0, lng = 0;
     while (index < len) {
-      let b,
-        shift = 0,
-        result = 0;
+      let b, shift = 0, result = 0;
       do {
         b = encoded.charCodeAt(index++) - 63;
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      const dlat = result & 1 ? ~(result >> 1) : result >> 1;
-      lat += dlat;
-
+      lat += result & 1 ? ~(result >> 1) : result >> 1;
       shift = 0;
       result = 0;
       do {
@@ -286,94 +210,161 @@ export default function MapScreen({ route, navigation }) {
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      const dlng = result & 1 ? ~(result >> 1) : result >> 1;
-      lng += dlng;
-
+      lng += result & 1 ? ~(result >> 1) : result >> 1;
       points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
     }
-
     return points;
   };
 
-  // Calculate the initial region based on available stops
-  // Filter out invalid coordinates (0,0)
-  const validStops = allStops.filter(stop => stop.latitude !== 0 && stop.longitude !== 0);
+  // Generate HTML for WebView map
+  const generateMapHTML = () => {
+    const markersJS = allStops.map((stop, i) => {
+      const isUserBoardingStop = i === userJourneyFromIndex;
+      const isUserAlightingStop = i === userJourneyToIndex;
+      const isOnUserJourney = i >= userJourneyFromIndex && i <= userJourneyToIndex;
 
-  console.log('🗺️ Valid stops count:', validStops.length, 'First stop coords:', validStops[0]);
-
-  const initialRegion = validStops.length > 0
-    ? {
-        latitude: validStops[0].latitude,
-        longitude: validStops[0].longitude,
-        latitudeDelta: LATITUDE_DELTA,
-        longitudeDelta: LONGITUDE_DELTA,
-      }
-    : {
-        latitude: 27.7172, // Default to Kathmandu if no stops
-        longitude: 85.3240,
-        latitudeDelta: LATITUDE_DELTA,
-        longitudeDelta: LONGITUDE_DELTA,
-      };
-
-  // Fit map to show all markers
-  const fitMapToMarkers = () => {
-    if (mapRef.current && mapLayout) {
-      const coordinatesToFit = [...allStops];
-
-      // Add home/origin coordinates if available
-      if (fromCoordinates) {
-        coordinatesToFit.unshift({
-          latitude: fromCoordinates.latitude,
-          longitude: fromCoordinates.longitude,
-        });
+      let markerColor = '#BDBDBD';
+      let markerSize = 8;
+      if (isUserBoardingStop || isUserAlightingStop) {
+        markerColor = colors.primary;
+        markerSize = 12;
+      } else if (isOnUserJourney) {
+        markerColor = colors.primary;
+        markerSize = 8;
       }
 
-      // Add destination coordinates if available
-      if (toCoordinates) {
-        coordinatesToFit.push({
-          latitude: toCoordinates.latitude,
-          longitude: toCoordinates.longitude,
-        });
-      }
+      return `
+        L.circleMarker([${stop.latitude}, ${stop.longitude}], {
+          radius: ${markerSize},
+          fillColor: '${markerColor}',
+          color: '#fff',
+          weight: 2,
+          opacity: 1,
+          fillOpacity: 0.9
+        }).addTo(map).bindPopup('<b>${stop.name}</b><br>${isUserBoardingStop ? '🚌 Board Here' : isUserAlightingStop ? '🚌 Alight Here' : 'Stop ' + (i + 1)}');
+      `;
+    }).join('\n');
 
-      if (coordinatesToFit.length > 0) {
-        mapRef.current.fitToCoordinates(
-          coordinatesToFit,
-          {
-            edgePadding: {
-              top: 100,
-              right: 50,
-              bottom: 150,
-              left: 50,
-            },
-            animated: true,
-          }
-        );
-      }
+    const polylinesJS = routeSegments.map((segment) => {
+      const coords = segment.coords.map(c => `[${c.latitude}, ${c.longitude}]`).join(',');
+      return `
+        L.polyline([${coords}], {
+          color: '${segment.color}',
+          weight: 5,
+          opacity: 0.8
+        }).addTo(map);
+      `;
+    }).join('\n');
+
+    const walkingToStartJS = walkingToStartCoords.length > 0 ? `
+      L.polyline([${walkingToStartCoords.map(c => `[${c.latitude}, ${c.longitude}]`).join(',')}], {
+        color: '${ROUTE_COLORS.walking}',
+        weight: 3,
+        opacity: 0.8,
+        dashArray: '10, 5'
+      }).addTo(map);
+    ` : '';
+
+    const walkingFromEndJS = walkingFromEndCoords.length > 0 ? `
+      L.polyline([${walkingFromEndCoords.map(c => `[${c.latitude}, ${c.longitude}]`).join(',')}], {
+        color: '${ROUTE_COLORS.walking}',
+        weight: 3,
+        opacity: 0.8,
+        dashArray: '10, 5'
+      }).addTo(map);
+    ` : '';
+
+    const fromMarkerJS = fromCoordinates ? `
+      L.marker([${fromCoordinates.latitude}, ${fromCoordinates.longitude}], {
+        icon: L.divIcon({
+          className: 'custom-marker',
+          html: '<div style="background-color: ${colors.success}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        })
+      }).addTo(map).bindPopup('<b>Starting Location</b>');
+    ` : '';
+
+    const toMarkerJS = toCoordinates ? `
+      L.marker([${toCoordinates.latitude}, ${toCoordinates.longitude}], {
+        icon: L.divIcon({
+          className: 'custom-marker',
+          html: '<div style="background-color: ${colors.danger || '#F44336'}; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        })
+      }).addTo(map).bindPopup('<b>Destination</b>');
+    ` : '';
+
+    // Calculate bounds
+    let boundsCoords = validStops.map(s => [s.latitude, s.longitude]);
+    if (fromCoordinates) boundsCoords.push([fromCoordinates.latitude, fromCoordinates.longitude]);
+    if (toCoordinates) boundsCoords.push([toCoordinates.latitude, toCoordinates.longitude]);
+
+    const boundsJS = boundsCoords.length > 0
+      ? `map.fitBounds([${boundsCoords.map(c => `[${c[0]}, ${c[1]}]`).join(',')}], { padding: [50, 50] });`
+      : `map.setView([${centerLat}, ${centerLng}], 13);`;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          html, body { width: 100%; height: 100%; overflow: hidden; }
+          #map { width: 100%; height: 100%; }
+          .custom-marker { background: transparent !important; border: none !important; }
+        </style>
+      </head>
+      <body>
+        <div id="map"></div>
+        <script>
+          var map = L.map('map', {
+            zoomControl: true,
+            attributionControl: false
+          });
+
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+          }).addTo(map);
+
+          ${boundsJS}
+          ${markersJS}
+          ${polylinesJS}
+          ${walkingToStartJS}
+          ${walkingFromEndJS}
+          ${fromMarkerJS}
+          ${toMarkerJS}
+
+          // Signal that map is ready
+          window.ReactNativeWebView.postMessage('mapReady');
+        </script>
+      </body>
+      </html>
+    `;
+  };
+
+  const handleWebViewMessage = (event) => {
+    if (event.nativeEvent.data === 'mapReady') {
+      setMapReady(true);
     }
   };
 
-  // Handle map layout ready
-  const onMapReady = () => {
-    console.log('🗺️ Map is ready!');
-    setMapLayout(true);
-    setMapReady(true);
-    setTimeout(fitMapToMarkers, 500);
-  };
-
-  // Empty state component to show when no route is selected
   const EmptyState = () => (
     <View style={styles.emptyStateContainer}>
-      <MaterialCommunityIcons 
-        name="map-search" 
-        size={64} 
-        color={`${colors.primary}80`} 
+      <MaterialCommunityIcons
+        name="map-search"
+        size={64}
+        color={`${colors.primary}80`}
       />
       <Text style={styles.emptyStateTitle}>No Route Selected</Text>
       <Text style={styles.emptyStateText}>
         Please search for a route on the Search screen and view it on the map.
       </Text>
-      <TouchableOpacity 
+      <TouchableOpacity
         style={styles.emptyStateButton}
         onPress={() => navigation.navigate('SearchTab')}
       >
@@ -387,169 +378,32 @@ export default function MapScreen({ route, navigation }) {
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.mapContainer}>
-        <MapView
-          key={`map-${initialRegion.latitude}-${initialRegion.longitude}`}
-          ref={mapRef}
-          style={styles.map}
-          region={initialRegion}
-          onMapReady={onMapReady}
-          onLayout={() => console.log('🗺️ Map layout complete')}
-          showsUserLocation={true}
-          showsMyLocationButton={false}
-          mapType="standard"
-          minZoomLevel={5}
-          maxZoomLevel={20}
-        >
-        {/* Home/Origin Marker */}
-        {fromCoordinates && (
-          <Marker
-            coordinate={{
-              latitude: fromCoordinates.latitude,
-              longitude: fromCoordinates.longitude,
-            }}
-            title="Starting Location"
-            description={fromLocation}
-          >
-            <View style={styles.markerContainer}>
-              <MaterialCommunityIcons
-                name="home"
-                size={28}
-                color={colors.success}
-              />
-            </View>
-          </Marker>
-        )}
-
-        {/* Destination/Home Marker */}
-        {toCoordinates && (
-          <Marker
-            coordinate={{
-              latitude: toCoordinates.latitude,
-              longitude: toCoordinates.longitude,
-            }}
-            title="Destination"
-            description={toLocation}
-          >
-            <View style={styles.markerContainer}>
-              <MaterialCommunityIcons
-                name="home-map-marker"
-                size={28}
-                color={colors.danger}
-              />
-            </View>
-          </Marker>
-        )}
-
-        {/* Bus Stop Markers */}
-        {allStops.map((stop, i) => {
-          const isRouteStart = i === 0; // Route start (C)
-          const isRouteEnd = i === allStops.length - 1; // Route end (D)
-          const isUserBoardingStop = i === userJourneyFromIndex; // User boards here (A)
-          const isUserAlightingStop = i === userJourneyToIndex; // User alights here (B)
-          const isOnUserJourney = i >= userJourneyFromIndex && i <= userJourneyToIndex;
-
-          // Check if this stop is a transfer point (appears multiple times)
-          const occurrences = allStops.filter(
-            s => s.name === stop.name &&
-                 s.latitude === stop.latitude &&
-                 s.longitude === stop.longitude
-          ).length;
-          const isTransferStop = occurrences > 1 || stop.isTransfer;
-
-          // Determine marker description
-          let description = `Stop ${i + 1}`;
-          if (isUserBoardingStop) description = '🚌 Board Here (Your Start)';
-          else if (isUserAlightingStop) description = '🚌 Alight Here (Your Destination)';
-          else if (isRouteStart) description = '🚏 Route Start';
-          else if (isRouteEnd) description = '🚏 Route End';
-          else if (isTransferStop) description = '🔄 Transfer Point';
-
-          return (
-            <Marker
-              key={`stop-${i}-${stop.latitude}-${stop.longitude}`}
-              coordinate={{
-                latitude: stop.latitude,
-                longitude: stop.longitude,
-              }}
-              title={stop.name}
-              description={description}
-            >
-              <View style={styles.markerContainer}>
-                {isUserBoardingStop ? (
-                  <MaterialCommunityIcons
-                    name="bus-stop"
-                    size={28}
-                    color={colors.primary}
-                  />
-                ) : isUserAlightingStop ? (
-                  <MaterialCommunityIcons
-                    name="bus-stop-covered"
-                    size={28}
-                    color={colors.primary}
-                  />
-                ) : isRouteStart ? (
-                  <MaterialCommunityIcons
-                    name="flag"
-                    size={24}
-                    color="#9E9E9E"
-                  />
-                ) : isRouteEnd ? (
-                  <MaterialCommunityIcons
-                    name="flag-checkered"
-                    size={24}
-                    color="#9E9E9E"
-                  />
-                ) : isTransferStop ? (
-                  <MaterialCommunityIcons
-                    name="transfer"
-                    size={28}
-                    color="#FF9800"
-                  />
-                ) : isOnUserJourney ? (
-                  <View style={[styles.stopMarker, { backgroundColor: colors.primary }]} />
-                ) : (
-                  <View style={[styles.stopMarker, { backgroundColor: '#BDBDBD' }]} />
-                )}
+        {allStops.length > 0 ? (
+          <WebView
+            ref={webViewRef}
+            source={{ html: generateMapHTML() }}
+            style={styles.map}
+            onMessage={handleWebViewMessage}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            startInLoadingState={true}
+            scalesPageToFit={true}
+            renderLoading={() => (
+              <View style={styles.webViewLoading}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.loadingText}>Loading map...</Text>
               </View>
-            </Marker>
-          );
-        })}
-
-        {/* Walking path from home to first bus stop */}
-        {walkingToStartCoords.length > 0 && (
-          <Polyline
-            coordinates={walkingToStartCoords}
-            strokeColor="#FF6B6B"
-            strokeWidth={3}
-            lineDashPattern={[10, 5]}
+            )}
           />
+        ) : (
+          <EmptyState />
         )}
-
-        {/* Render all route segments with different colors */}
-        {routeSegments.map((segment, index) => (
-          <Polyline
-            key={`segment-${index}`}
-            coordinates={segment.coords}
-            strokeColor={segment.color}
-            strokeWidth={5}
-          />
-        ))}
-
-        {/* Walking path from last bus stop to destination */}
-        {walkingFromEndCoords.length > 0 && (
-          <Polyline
-            coordinates={walkingFromEndCoords}
-            strokeColor="#FF6B6B"
-            strokeWidth={3}
-            lineDashPattern={[10, 5]}
-          />
-        )}
-      </MapView>
       </View>
 
       {loading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading route...</Text>
         </View>
       )}
 
@@ -558,8 +412,6 @@ export default function MapScreen({ route, navigation }) {
           <Text style={styles.errorText}>{error}</Text>
         </View>
       )}
-
-      {allStops.length === 0 && <EmptyState />}
 
       <View style={styles.header}>
         <TouchableOpacity
@@ -574,7 +426,7 @@ export default function MapScreen({ route, navigation }) {
           </Text>
           {allStops.length > 0 && (
             <Text style={styles.routePath} numberOfLines={1}>
-              {fromLocation} → {isMultiLeg && transferStopCoord ? 
+              {fromLocation} → {isMultiLeg && transferStopCoord ?
                 `${transferStopCoord.name} → ` : ''}{toLocation}
             </Text>
           )}
@@ -584,7 +436,6 @@ export default function MapScreen({ route, navigation }) {
       {/* Route Legend */}
       {allStops.length > 0 && (
         <View style={styles.routeLegend}>
-          {/* Walking legend item */}
           {(walkingToStartCoords.length > 0 || walkingFromEndCoords.length > 0) && (
             <View style={styles.legendItem}>
               <View style={styles.lineExample}>
@@ -594,7 +445,6 @@ export default function MapScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* User Journey (highlighted) */}
           <View style={styles.legendItem}>
             <View style={styles.lineExample}>
               <View style={[styles.lineColor, { backgroundColor: ROUTE_COLORS.userJourney }]} />
@@ -602,7 +452,6 @@ export default function MapScreen({ route, navigation }) {
             <Text style={styles.legendText}>Your Journey</Text>
           </View>
 
-          {/* Complete Route (gray) - show only if there are segments before/after user journey */}
           {(journeySegments.beforeJourney.length >= 2 || journeySegments.afterJourney.length >= 2) && (
             <View style={styles.legendItem}>
               <View style={styles.lineExample}>
@@ -612,7 +461,6 @@ export default function MapScreen({ route, navigation }) {
             </View>
           )}
 
-          {/* Boarding/Alighting markers */}
           <View style={styles.legendItem}>
             <MaterialCommunityIcons name="bus-stop" size={16} color={colors.primary} />
             <Text style={styles.legendText}>Board/Alight</Text>
@@ -622,7 +470,15 @@ export default function MapScreen({ route, navigation }) {
 
       <TouchableOpacity
         style={styles.fitToMarkersButton}
-        onPress={fitMapToMarkers}
+        onPress={() => {
+          if (webViewRef.current) {
+            let boundsCoords = validStops.map(s => [s.latitude, s.longitude]);
+            if (fromCoordinates) boundsCoords.push([fromCoordinates.latitude, fromCoordinates.longitude]);
+            if (toCoordinates) boundsCoords.push([toCoordinates.latitude, toCoordinates.longitude]);
+            const js = `map.fitBounds([${boundsCoords.map(c => `[${c[0]}, ${c[1]}]`).join(',')}], { padding: [50, 50] }); true;`;
+            webViewRef.current.injectJavaScript(js);
+          }
+        }}
       >
         <MaterialCommunityIcons
           name="fit-to-page-outline"
@@ -648,6 +504,16 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+  },
+  webViewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
   },
   header: {
     position: 'absolute',
@@ -686,36 +552,6 @@ const styles = StyleSheet.create({
     fontSize: fontSizes.sm,
     color: colors.secondaryText,
   },
-  markerContainer: {
-    backgroundColor: colors.background,
-    padding: 4,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  stopMarker: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.primary,
-  },
-  legend: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    padding: spacing.sm,
-    flexDirection: 'row',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
   routeLegend: {
     position: 'absolute',
     bottom: 20,
@@ -741,11 +577,6 @@ const styles = StyleSheet.create({
     color: colors.primaryText,
     marginLeft: spacing.xs,
   },
-  legendLine: {
-    width: 20,
-    height: 4,
-    borderRadius: 2,
-  },
   lineExample: {
     width: 16,
     height: 16,
@@ -765,6 +596,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  },
+  loadingText: {
+    marginTop: spacing.sm,
+    color: colors.primaryText,
+    fontSize: fontSizes.sm,
   },
   errorContainer: {
     position: 'absolute',
@@ -786,14 +622,10 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   emptyStateContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: colors.background,
     padding: spacing.xl,
   },
   emptyStateTitle: {
