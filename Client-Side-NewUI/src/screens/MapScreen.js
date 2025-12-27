@@ -7,8 +7,14 @@ import {
   SafeAreaView,
   ActivityIndicator,
   StatusBar,
+  Dimensions,
 } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const ASPECT_RATIO = SCREEN_WIDTH / SCREEN_HEIGHT;
+const LATITUDE_DELTA = 0.0922;
+const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors, spacing, fontSizes } from '../constants/theme';
 import { API_BASE_URL } from '../config/api';
@@ -289,18 +295,23 @@ export default function MapScreen({ route, navigation }) {
   };
 
   // Calculate the initial region based on available stops
-  const initialRegion = allStops.length > 0 
+  // Filter out invalid coordinates (0,0)
+  const validStops = allStops.filter(stop => stop.latitude !== 0 && stop.longitude !== 0);
+
+  console.log('🗺️ Valid stops count:', validStops.length, 'First stop coords:', validStops[0]);
+
+  const initialRegion = validStops.length > 0
     ? {
-        latitude: allStops[0].latitude,
-        longitude: allStops[0].longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
+        latitude: validStops[0].latitude,
+        longitude: validStops[0].longitude,
+        latitudeDelta: LATITUDE_DELTA,
+        longitudeDelta: LONGITUDE_DELTA,
       }
     : {
         latitude: 27.7172, // Default to Kathmandu if no stops
         longitude: 85.3240,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
+        latitudeDelta: LATITUDE_DELTA,
+        longitudeDelta: LONGITUDE_DELTA,
       };
 
   // Fit map to show all markers
@@ -371,16 +382,20 @@ export default function MapScreen({ route, navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        initialRegion={initialRegion}
-        onMapReady={onMapReady}
-        showsUserLocation={true}
-        showsMyLocationButton={false}
-        mapType="standard"
-      >
+
+      <View style={styles.mapContainer}>
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          initialRegion={initialRegion}
+          onMapReady={onMapReady}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+          mapType="standard"
+          loadingEnabled={true}
+          loadingIndicatorColor={colors.primary}
+          loadingBackgroundColor={colors.background}
+        >
         {/* Home/Origin Marker */}
         {fromCoordinates && (
           <Marker
@@ -526,6 +541,7 @@ export default function MapScreen({ route, navigation }) {
           />
         )}
       </MapView>
+      </View>
 
       {loading && (
         <View style={styles.loadingContainer}>
@@ -619,8 +635,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  mapContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
   header: {
     position: 'absolute',
