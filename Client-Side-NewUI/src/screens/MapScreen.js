@@ -54,7 +54,10 @@ export default function MapScreen({ route, navigation }) {
     toLocation,
     userJourneyFromIndex,
     userJourneyToIndex,
-    paramIsMultiLeg
+    paramIsMultiLeg,
+    secondLegStopsCount: secondLegStops.length,
+    transferStopName: transferStop?.stops_name || transferStop?.name || 'none',
+    secondLegStopsPreview: secondLegStops.slice(0, 3).map(s => s.name || s.stops_name || s.lat)
   });
 
   // Log all stops for debugging

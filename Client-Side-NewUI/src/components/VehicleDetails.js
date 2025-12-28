@@ -257,7 +257,19 @@ const VehicleDetails = ({ route, navigation }) => {
     if (safeTransport.isMultiLeg && safeTransport.secondLeg) {
       mapParams.isMultiLeg = true;
       mapParams.transferStop = safeTransport.transferStop;
-      mapParams.secondLegStops = safeTransport.secondLeg.stops || [];
+
+      // Convert second leg stops to proper format
+      const secondLegStopsRaw = safeTransport.secondLeg.stops || [];
+      const secondLegStopsConverted = convertStops(secondLegStopsRaw);
+      mapParams.secondLegStops = secondLegStopsConverted;
+
+      console.log('🚌 Multi-leg map params:', {
+        isMultiLeg: true,
+        transferStop: safeTransport.transferStop?.stops_name || safeTransport.transferStop?.name,
+        firstLegStopsCount: mapStops.length,
+        secondLegStopsCount: secondLegStopsConverted.length,
+        secondLegStops: secondLegStopsConverted.map(s => s.name || s.stops_name)
+      });
     }
 
     navigation.navigate('MapScreen', mapParams);
