@@ -44,6 +44,13 @@ const VehicleDetails = ({ route, navigation }) => {
   // Enhanced safeTransport object to include multi-leg journey properties
   const safeTransport = React.useMemo(() => {
     console.log("Raw transport data:", transport);
+    console.log("🔍 Multi-leg check in VehicleDetails:", {
+      isMultiLeg: transport?.isMultiLeg,
+      hasSecondLeg: !!transport?.secondLeg,
+      transferStop: transport?.transferStop?.stops_name || transport?.transferStop?.name || 'none',
+      secondLegStopsCount: transport?.secondLeg?.stops?.length || 0,
+      routeName: transport?.routeName
+    });
 
     // User journey stops (filtered to user's from/to)
     const userStops = convertStops(transport?.stops);
