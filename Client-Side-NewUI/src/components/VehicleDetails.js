@@ -143,10 +143,21 @@ const VehicleDetails = ({ route, navigation }) => {
   }, [isFavorite, safeTransport]);
 
   const handleViewMap = () => {
-    // Use allRouteStops for map (full route), fall back to stops (user journey)
-    const mapStops = safeTransport.allRouteStops && safeTransport.allRouteStops.length > 0
-      ? safeTransport.allRouteStops
-      : safeTransport.stops;
+    // Detect if this is a multi-leg route by checking:
+    // 1. Route name contains " → " (arrow separator between routes)
+    // 2. stops array is longer than allRouteStops (combined vs single route)
+    // 3. There's a duplicate stop in stops array (transfer point)
+    const hasArrowInName = safeTransport.routeName?.includes(' → ') || safeTransport.routeNo?.includes(' → ');
+    const stopsLongerThanAllRoute = safeTransport.stops.length > safeTransport.allRouteStops.length;
+    const isLikelyMultiLeg = hasArrowInName || stopsLongerThanAllRoute || safeTransport.isMultiLeg;
+
+    // For multi-leg routes, use the combined stops array (has both legs with transfer point)
+    // For single routes, use allRouteStops (full route from terminus to terminus)
+    const mapStops = isLikelyMultiLeg
+      ? safeTransport.stops  // Combined stops with transfer point appearing twice
+      : (safeTransport.allRouteStops && safeTransport.allRouteStops.length > 0
+          ? safeTransport.allRouteStops
+          : safeTransport.stops);
 
     if (!mapStops || mapStops.length === 0) {
       alert("No stop information available to display on the map.");
@@ -155,7 +166,10 @@ const VehicleDetails = ({ route, navigation }) => {
 
     console.log('🗺️ handleViewMap - Starting with:', {
       userJourneyStops: safeTransport.stops.length,
-      fullRouteStops: mapStops.length,
+      allRouteStops: safeTransport.allRouteStops.length,
+      mapStopsUsed: mapStops.length,
+      isLikelyMultiLeg,
+      hasArrowInName,
       fromLocation,
       toLocation,
       fromStopId: safeTransport.fromStopId,
@@ -261,21 +275,25 @@ const VehicleDetails = ({ route, navigation }) => {
     }
 
     // For multi-leg journeys, add additional parameters
-    if (safeTransport.isMultiLeg && safeTransport.secondLeg) {
+    // Set isMultiLeg based on our detection OR the original flag
+    if (isLikelyMultiLeg) {
       mapParams.isMultiLeg = true;
-      mapParams.transferStop = safeTransport.transferStop;
+      mapParams.routeName = safeTransport.routeName; // Pass route name for arrow detection
+      mapParams.routeNo = safeTransport.routeNo;
 
-      // Convert second leg stops to proper format
-      const secondLegStopsRaw = safeTransport.secondLeg.stops || [];
-      const secondLegStopsConverted = convertStops(secondLegStopsRaw);
-      mapParams.secondLegStops = secondLegStopsConverted;
+      // If we have explicit secondLeg data, use it
+      if (safeTransport.secondLeg) {
+        mapParams.transferStop = safeTransport.transferStop;
+        const secondLegStopsRaw = safeTransport.secondLeg.stops || [];
+        const secondLegStopsConverted = convertStops(secondLegStopsRaw);
+        mapParams.secondLegStops = secondLegStopsConverted;
+      }
 
       console.log('🚌 Multi-leg map params:', {
         isMultiLeg: true,
-        transferStop: safeTransport.transferStop?.stops_name || safeTransport.transferStop?.name,
-        firstLegStopsCount: mapStops.length,
-        secondLegStopsCount: secondLegStopsConverted.length,
-        secondLegStops: secondLegStopsConverted.map(s => s.name || s.stops_name)
+        routeName: safeTransport.routeName,
+        hasExplicitSecondLeg: !!safeTransport.secondLeg,
+        mapStopsCount: mapStops.length
       });
     }
 
