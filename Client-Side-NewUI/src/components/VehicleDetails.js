@@ -433,8 +433,32 @@ const VehicleDetails = ({ route, navigation }) => {
       const endIndex = Math.max(fromIndex, toIndex);
 
       const slicedStops = safeTransport.stops.slice(startIndex, endIndex + 1);
-      console.log("VehicleDetails - Filtered stops:", slicedStops.length, "out of", safeTransport.stops.length);
-      setFilteredStops(slicedStops);
+
+      // Remove duplicate consecutive stops (transfer points where same stop appears twice)
+      // Mark the first occurrence as a transfer point instead
+      const deduplicatedStops = [];
+      for (let i = 0; i < slicedStops.length; i++) {
+        const currentStop = slicedStops[i];
+        const nextStop = slicedStops[i + 1];
+
+        // Check if next stop is a duplicate (same id or same coordinates)
+        const isDuplicateNext = nextStop && (
+          currentStop.id === nextStop.id ||
+          (currentStop.lat === nextStop.lat && currentStop.lon === nextStop.lon)
+        );
+
+        if (isDuplicateNext) {
+          // Mark this stop as a transfer point and skip the next duplicate
+          deduplicatedStops.push({ ...currentStop, isTransfer: true });
+          i++; // Skip the next stop (duplicate)
+        } else {
+          deduplicatedStops.push(currentStop);
+        }
+      }
+
+      console.log("VehicleDetails - Filtered stops:", deduplicatedStops.length, "out of", safeTransport.stops.length,
+        "(removed", slicedStops.length - deduplicatedStops.length, "duplicate transfer stops)");
+      setFilteredStops(deduplicatedStops);
     }
   }, [safeTransport, fromLocation, toLocation]);
 
@@ -446,7 +470,9 @@ const VehicleDetails = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.primaryText} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {safeTransport.isMultiLeg ? 'Multi-Leg Journey' : `${safeTransport.vehicleType?.toUpperCase()} Details`}
+          {(safeTransport.isMultiLeg || safeTransport.routeName?.includes(' → ') || filteredStops.some(s => s.isTransfer))
+            ? 'Multi-Leg Journey'
+            : `${safeTransport.vehicleType?.toUpperCase()} Details`}
         </Text>
         <TouchableOpacity style={styles.headerButton} onPress={handleToggleFavorite} disabled={isLoadingFavorite}>
           {isLoadingFavorite ? (
@@ -652,6 +678,7 @@ const VehicleDetails = ({ route, navigation }) => {
                   index={index}
                   isFirst={index === 0}
                   isLast={index === filteredStops.length - 1}
+                  isTransfer={stop.isTransfer === true}
                 />
               ))}
             </View>

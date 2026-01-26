@@ -63,7 +63,7 @@ import {
             placeholderTextColor={COLORS.muted}
             keyboardType={keyboardType}
             autoCapitalize={keyboardType === "email-address" ? "none" : "sentences"}
-            secureTextEntry={secureTextEntry && !uiState.showPassword}
+            secureTextEntry={secureTextEntry && (fieldName === 'confirmPassword' ? !uiState.showConfirmPassword : !uiState.showPassword)}
             editable={editable}
             maxLength={maxLength}
           />
@@ -81,6 +81,20 @@ import {
               />
             </TouchableOpacity>
           )}
+          {fieldName === 'confirmPassword' && (
+            <TouchableOpacity
+              onPress={() => setUiState(prev => ({ ...prev, showConfirmPassword: !prev.showConfirmPassword }))}
+              style={styles.eyeIcon}
+              disabled={!editable}
+              activeOpacity={0.7}
+            >
+              <MaterialIcons
+                name={uiState.showConfirmPassword ? "visibility" : "visibility-off"}
+                size={22}
+                color={COLORS.muted}
+              />
+            </TouchableOpacity>
+          )}
         </View>
         {hasError && <Text style={styles.errorText}>{hasError}</Text>}
       </View>
@@ -88,16 +102,18 @@ import {
   };
   
   const RegisterScreen = () => {
-    const [formData, setFormData] = useState({ 
-      fullName: "", 
-      email: "", 
+    const [formData, setFormData] = useState({
+      fullName: "",
+      email: "",
       phoneNumber: "",
-      password: "" 
+      password: "",
+      confirmPassword: ""
     });
-    const [uiState, setUiState] = useState({ 
-      isLoading: false, 
-      showPassword: false, 
-      errors: {} 
+    const [uiState, setUiState] = useState({
+      isLoading: false,
+      showPassword: false,
+      showConfirmPassword: false,
+      errors: {}
     });
     
     const navigation = useNavigation();
@@ -125,10 +141,16 @@ import {
         const hasUpperCase = /[A-Z]/.test(formData.password);
         const hasLowerCase = /[a-z]/.test(formData.password);
         const hasNumber = /[0-9]/.test(formData.password);
-        
+
         if (!hasUpperCase || !hasLowerCase || !hasNumber) {
           errors.password = "Must contain uppercase, lowercase & number";
         }
+      }
+
+      if (!formData.confirmPassword.trim()) {
+        errors.confirmPassword = "Please confirm your password";
+      } else if (formData.password !== formData.confirmPassword) {
+        errors.confirmPassword = "Passwords do not match";
       }
       
       if (formData.phoneNumber && formData.phoneNumber.trim()) {
@@ -261,6 +283,19 @@ import {
                   onChangeText={value => handleInputChange('password', value)}
                   secureTextEntry={true}
                   fieldName="password"
+                  uiState={uiState}
+                  setUiState={setUiState}
+                  editable={!uiState.isLoading}
+                />
+
+                <InputField
+                  iconType="AntDesign"
+                  iconName="lock1"
+                  placeholder="Confirm Password"
+                  value={formData.confirmPassword}
+                  onChangeText={value => handleInputChange('confirmPassword', value)}
+                  secureTextEntry={true}
+                  fieldName="confirmPassword"
                   uiState={uiState}
                   setUiState={setUiState}
                   editable={!uiState.isLoading}
